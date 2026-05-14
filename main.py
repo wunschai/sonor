@@ -53,6 +53,32 @@ def _radius_of(entity):
     return _UNIT_RADII.get(size, 8)
 
 
+def _draw_unit_bars(surface, entity, sx, sy, radius):
+    """Draw HP bar (and cargo bar for mining ships) above the entity circle."""
+    if not hasattr(entity, "hp") or not hasattr(entity, "max_hp"):
+        return
+
+    bar_w = radius * 2 + 4
+    bar_h = 4
+    bar_x = sx - radius - 2
+    bar_y = sy - radius - 8 - bar_h
+
+    # HP bar: red background, green fill
+    hp_ratio = max(0.0, entity.hp / entity.max_hp) if entity.max_hp > 0 else 0.0
+    pygame.draw.rect(surface, (180, 0, 0), (bar_x, bar_y, bar_w, bar_h))
+    pygame.draw.rect(surface, (0, 200, 0), (bar_x, bar_y, int(bar_w * hp_ratio), bar_h))
+
+    # Cargo bar for MiningShip in MINING state
+    if (type(entity).__name__ == "MiningShip"
+            and getattr(entity, "state", None) == "MINING"
+            and hasattr(entity, "cargo") and hasattr(entity, "cargo_cap")
+            and entity.cargo_cap > 0):
+        cargo_ratio = max(0.0, entity.cargo / entity.cargo_cap)
+        cargo_y = bar_y + bar_h + 1
+        pygame.draw.rect(surface, (0, 0, 100), (bar_x, cargo_y, bar_w, bar_h))
+        pygame.draw.rect(surface, (0, 120, 255), (bar_x, cargo_y, int(bar_w * cargo_ratio), bar_h))
+
+
 def _draw_entities(surface, world, fog, cam_x, cam_y, selection):
     for e in world.entities:
         if not should_draw_entity(e, fog):
@@ -68,6 +94,12 @@ def _draw_entities(surface, world, fog, cam_x, cam_y, selection):
         pygame.draw.circle(surface, col, (wx, wy), r)
         if e in selection:
             pygame.draw.circle(surface, (255, 255, 0), (wx, wy), r + 3, 2)
+        # Hit flash overlay
+        if getattr(e, "_hit_flash", 0) > 0:
+            flash_surf = pygame.Surface((r * 2 + 2, r * 2 + 2), pygame.SRCALPHA)
+            pygame.draw.circle(flash_surf, (255, 0, 0, 160), (r + 1, r + 1), r)
+            surface.blit(flash_surf, (wx - r - 1, wy - r - 1))
+        _draw_unit_bars(surface, e, wx, wy, r)
 
 
 def _draw_hud(surface, world, font):
@@ -399,13 +431,18 @@ def main():
 
         # Passive sonar: detect moving enemies
         enemy_units = world.entities_for_team(1)
-        passive_hits = passive.detect(player_units, enemy_units)
+        passive_hits = passive.detect(player_units, enemy_units, dt)
         for h in passive_hits:
             sonar_fx.add_hit(h)
             sonar_hits.append(h)
 
         # Reveal asteroids via sonar hits
         mining_sys.reveal_by_hits(world, sonar_hits)
+
+        # ── Hit flash decay ───────────────────────────────────────
+        for e in world.entities:
+            if hasattr(e, "_hit_flash"):
+                e._hit_flash = max(0.0, e._hit_flash - dt)
 
         # ── Draw ──────────────────────────────────────────────────
         screen.fill((5, 5, 15))
@@ -416,15 +453,15 @@ def main():
 
         _draw_entities(screen, world, fog, cam_x, cam_y, selection)
 
-        # Sonar FX overlay (on top of entities, below fog)
-        sonar_fx.draw(screen, (cam_x, cam_y))
-
-        # Fog overlay (after entities + sonar fx, before HUD)
+        # Fog overlay (covers unknown areas)
         fog.draw(screen, (cam_x, cam_y))
 
-        # Minimap (bottom-right corner, above fog)
-        mm_x = SCREEN_WIDTH  - minimap.mm_w - 10
-        mm_y = SCREEN_HEIGHT - minimap.mm_h - 10
+        # Sonar FX overlay (above fog so hits are visible through darkness)
+        sonar_fx.draw(screen, (cam_x, cam_y))
+
+        # Minimap (top-right corner, avoids control panel overlap)
+        mm_x = SCREEN_WIDTH - minimap.mm_w - 10
+        mm_y = 10
         mm_surf = pygame.Surface((minimap.mm_w, minimap.mm_h), pygame.SRCALPHA)
         minimap.draw(mm_surf, world, sonar_hits)
         screen.blit(mm_surf, (mm_x, mm_y))

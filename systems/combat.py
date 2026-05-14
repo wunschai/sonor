@@ -31,6 +31,7 @@ class CombatSystem:
             # Fire
             attacker._fire_timer = 1.0 / attacker.fire_rate
             killed = target.take_damage(attacker.damage)
+            target._hit_flash = 0.3
             if killed and target not in dead:
                 dead.append(target)
 

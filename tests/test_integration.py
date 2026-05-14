@@ -121,7 +121,7 @@ def run_game(world: World, n_frames: int, dt: float = 1 / 60) -> object:
         sonar_fx.update(dt)
 
         enemy_units = world.entities_for_team(TEAM_ENEMY)
-        passive_hits = passive.detect(player_units, enemy_units)
+        passive_hits = passive.detect(player_units, enemy_units, dt)
         for h in passive_hits:
             sonar_fx.add_hit(h)
             sonar_hits.append(h)

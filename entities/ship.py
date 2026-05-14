@@ -65,6 +65,7 @@ class CombatShip(Unit):
         self.sonar = SonarController()
         self.speed_mode = SpeedMode()
         self._fire_timer = 1.0 / self.fire_rate   # time until next shot
+        self._target_pos = None                    # movement target (set by player or AI)
 
 
 class MiningShip(Unit):

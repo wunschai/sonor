@@ -73,12 +73,23 @@ class ActivePulse:
 class PassiveDetector:
     """Detects nearby moving enemies based on their noise signature."""
 
-    def detect(self, viewers: list, enemies: list) -> List[SonarHit]:
+    def __init__(self):
+        self._timer = 0.0
+        self._interval = 1.5
+
+    def detect(self, viewers: list, enemies: list, dt: float = 0.0) -> List[SonarHit]:
         """
         viewers — player units whose position is used as the listening centre.
         enemies — candidate units to detect (non-player checked automatically).
+        dt — time delta; when non-zero, gating timer is applied (1.5 s interval).
         Returns list of SonarHit, one per viewer-enemy pair that triggers.
         """
+        if dt > 0.0:
+            self._timer += dt
+            if self._timer < self._interval:
+                return []
+            self._timer -= self._interval
+
         hits: List[SonarHit] = []
 
         for viewer in viewers:

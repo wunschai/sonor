@@ -106,6 +106,40 @@ class ControlPanel:
                 f"Buffer: {int(unit.buffer)}/{unit.buffer_cap}", True, _COL_TEXT)
             surface.blit(buf_txt, (8, surface.get_height() - 20))
 
+        # Build queue progress for Mothership
+        if isinstance(unit, Mothership):
+            self._draw_build_queues(surface, unit)
+
+    def _draw_build_queues(self, surface: pygame.Surface, ms: Mothership) -> None:
+        """Draw build queue progress bars at the bottom of the panel."""
+        panel_h = surface.get_height()
+        bar_w = 160
+        bar_h = 8
+        pad = 8
+        x = pad
+        y = panel_h - bar_h - 20
+
+        for i, q in enumerate(ms.build_queues):
+            if q.producing is None:
+                continue
+            total = getattr(q, "_current_build_time", 1.0)
+            if total <= 0:
+                total = 1.0
+            ratio = min(1.0, q.progress / total)
+            remaining = max(0.0, total - q.progress)
+
+            # White background bar
+            pygame.draw.rect(surface, (200, 200, 200), (x, y, bar_w, bar_h))
+            # Grey fill for progress
+            pygame.draw.rect(surface, (100, 160, 220), (x, y, int(bar_w * ratio), bar_h))
+            pygame.draw.rect(surface, (150, 150, 160), (x, y, bar_w, bar_h), 1)
+
+            label = self._small_font.render(
+                f"Q{i+1}: {q.producing}  {remaining:.1f}s", True, _COL_TEXT)
+            surface.blit(label, (x + bar_w + 6, y - 1))
+
+            y -= bar_h + 14
+
     # ── Button builders ───────────────────────────────────────────
 
     def _build_buttons(self) -> List[PanelButton]:
