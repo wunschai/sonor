@@ -1,0 +1,4 @@
+pygame-ce==2.5.7
+numpy==2.2.5
+pytest==8.3.5
+pytest-mock==3.14.0
