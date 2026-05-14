@@ -144,3 +144,83 @@ game_result 不為 None 時顯示半透明 overlay + 勝敗文字 + "Press R to 
 - `tests/test_control_panel.py`: 18 passed
 - `tests/test_ai.py`: 9 passed
 - 全 Milestone 合計：**223 passed, 0 failed**
+
+---
+
+## Post-M5 Cross-Review 修正
+
+### 決策記錄
+
+**xreview 以兩個獨立 reviewer 並行審查**
+orchestrator script 缺失，改為直接派兩個 ddd-reviewer subagent 平行執行，coordinator 驗證 Critical/Important findings 後再套用。
+
+**C1：sonar pulse 強度使用屬性值**
+`main.py` 原本 hardcode `strength=2`，改為 `getattr(e, "sonar_strength", 1)`，讓不同大小戰艦的聲納強度正確反映。
+
+**C2：移除 K_s dead code**
+`keys[pygame.K_s and 0]` 是無效表達式（`and` 在 Python 返回 0），移除兩行死碼。
+
+**C3：Mothership build_queues 從未被 tick**
+`main.py` 缺少對 `build_queues` 的 `q.update(dt)` 呼叫，導致 AI 永遠無法建造戰艦。補上每 frame 的 tick 邏輯與 CombatShip spawn。同時 `systems/mining.py` 的採礦收礦邏輯只處理 TEAM_PLAYER，修正為雙方都適用。
+
+**C4：resources=9999 旁路**
+`ControlPanel` 建造按鈕未收到 world 引用，資源檢查 fallback 到 9999（永遠可以造）。修正：`set_selection(units, world=world)` 傳入 world，`_make_enqueue` 使用實際 `world.resources`。
+
+**I1：PassiveDetector 未使用 effective_speed**
+被動聲納音量計算使用 `_current_speed` fallback，改為 `speed_mode.effective_speed(speed)`，boost 狀態下的船隻音量才會正確放大。
+
+**I2：COLLECTING_STATION 廢棄狀態**
+MiningShip.STATES 和 mining.py 裡的 dead elif 分支都殘留 COLLECTING_STATION，一併移除。
+
+**I3：MOVING_TO_AST None crash**
+`assigned_asteroid` 可能為 None 時（採礦船 state 被設定但礦未指派），直接呼叫 `asteroid.pos` 會 crash。加 None guard：`if ship.assigned_asteroid is None: ship.state = "IDLE"; continue`。
+
+**I4：fog.draw() alpha 與效能問題**
+原本用 PixelArray 逐格寫 alpha，DARK 區域 alpha=0（透明而非不透明）。改為 numpy surfarray 批次寫入：`pixels_alpha(fog_surf)[:] = alpha.T`，DARK=255 / SHROUD=160 / VISIBLE=0。
+
+### 測試結果
+- 8 項修正套用後：**223 passed, 0 failed**
+
+---
+
+## Post-M5 Gameplay 修正（實機測試）
+
+### 決策記錄
+
+**CombatShip 缺少 _target_pos 初始化**
+`CombatShip.__init__` 未設 `self._target_pos = None`，導致 `hasattr(e, "_target_pos")` 為 False，右鍵移動命令永遠無效。補上初始化後戰艦可正常移動。
+
+**SonarFX 渲染在霧下方**
+原渲染順序：entities → sonar_fx → fog。sonar hit 標記被霧覆蓋而看不見。改為：entities → fog → sonar_fx，讓聲納接觸點顯示在霧上方。
+
+**ControlPanel 按鈕座標系統錯誤**
+按鈕 rect 是 panel-local 座標（y≈30），`handle_event` 卻用螢幕絕對座標（y≈590）比對，導致所有按鈕永遠點不到。修正：`ControlPanel(panel_y=560)` 記住自身螢幕位置，`handle_event` 先扣偏移量再比對。同時加 `in_panel()` 防止 panel 區域的點擊穿透到遊戲世界的選取邏輯。
+
+**EnemyAI._tick_mining None crash**
+沒有敵方母艦時 `em.pos` 拋 AttributeError。加 `if em is None: return` guard。
+
+**Headless 整合測試**
+新增 `tests/test_integration.py`（7 個端對端測試）：smoke、採礦、戰鬥、AI、建造佇列、勝利條件、移動指令。使用 `SDL_VIDEODRIVER=dummy` 無頭執行，模擬完整主循環邏輯。
+
+**視覺回饋補強**
+- HP bar 顯示在所有可見單位頭頂；採礦中的 MiningShip 額外顯示藍色貨艙 bar
+- 母艦控制面板底部顯示建造佇列進度 bar + 剩餘秒數
+- 命中時目標閃紅光 0.3 秒（_hit_flash 屬性）
+- PassiveDetector 改為每 1.5 秒偵測一次，減少視覺噪音
+- 小地圖移至右上角，避免與底部控制面板重疊
+
+**AI 平衡調整**
+- `_startup_timer = 60.0`：開場 60 秒 AI 不行動，給玩家緩衝
+- `AI_ATTACK_THRESHOLD = 5`（原 3）：需要更多戰艦才進攻
+- 採礦船生成需要消耗 `MINING_SHIP_COST` 資源（原本免費瞬間出現）
+- 敵方初始資源 200 解決 AI bootstrap 問題
+
+**Unit Roster 左側面板**
+左側 180px 的單位清單，列出所有玩家單位（類型縮寫、HP bar、state）。左鍵點擊選取、Shift+點多選。拖曳選框只在 x > 180 時觸發（避開 roster 區域）。
+
+**母艦建造選項擴充**
+新增 MiningShip 和 BuilderShip 的建造按鈕；`MINING_SHIP_BUILD_TIME = 15s`、`BUILDER_SHIP_BUILD_TIME = 20s` 加入 constants.py。母艦的兩條建造佇列均顯示（空閒也顯示「——」）。
+
+### 測試結果
+- `tests/test_integration.py`: 7 passed
+- 全部合計：**230 passed, 0 failed**
