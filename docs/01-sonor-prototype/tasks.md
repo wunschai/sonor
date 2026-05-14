@@ -25,12 +25,12 @@
 > **預期結果：** 全圖純黑，玩家單位周圍可見圓完整顯示，單位離開後轉為半透明（可見地形不見動態單位），DARK 區域絕對不顯示任何資訊
 > **驗證方式：** `pytest tests/test_fog.py` 全過；hand test 視覺三態效果
 
-- [ ] Task 2.1: 撰寫 `FogMap` 測試（初始全 DARK、update() 後 vision_radius 內變 VISIBLE、單位移開後變 SHROUD、is_visible() 查詢正確） (Red)
-- [ ] Task 2.2: 實作 `FogMap`（`numpy.ndarray` 存三態、`pygame.surfarray` 映射）(`core/fog.py`) (Green)
-- [ ] Task 2.3: 撰寫迷霧渲染整合測試（DARK=全黑不透明、SHROUD=半透明黑、VISIBLE=透明；enemy 在 DARK 區不被 draw） (Red)
-- [ ] Task 2.4: 實作 `FogMap.draw()` + 整合到主渲染管線（渲染順序：地圖 → entity → fog overlay）(Green)
-- [ ] Task 2.5: 撰寫礦場永久標示測試（Asteroid.revealed=True 後，即使在 SHROUD/DARK 仍顯示標記） (Red)
-- [ ] Task 2.6: 實作礦場永久標示邏輯（`FogMap` 維護 `revealed_positions` set，draw 時疊加「∞」標籤與小地圖綠色方塊）(Green)
+- [x] Task 2.1: 撰寫 `FogMap` 測試（初始全 DARK、update() 後 vision_radius 內變 VISIBLE、單位移開後變 SHROUD、is_visible() 查詢正確） (Red)
+- [x] Task 2.2: 實作 `FogMap`（`numpy.ndarray` 存三態、`pygame.surfarray` 映射）(`core/fog.py`) (Green)
+- [x] Task 2.3: 撰寫迷霧渲染整合測試（DARK=全黑不透明、SHROUD=半透明黑、VISIBLE=透明；enemy 在 DARK 區不被 draw） (Red)
+- [x] Task 2.4: 實作 `FogMap.draw()` + 整合到主渲染管線（渲染順序：地圖 → entity → fog overlay）(Green)
+- [x] Task 2.5: 撰寫礦場永久標示測試（Asteroid.revealed=True 後，即使在 SHROUD/DARK 仍顯示標記） (Red)
+- [x] Task 2.6: 實作礦場永久標示邏輯（`FogMap` 維護 `revealed_positions` set，draw 時疊加「∞」標籤與小地圖綠色方塊）(Green)
 
 ---
 

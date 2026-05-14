@@ -10,6 +10,8 @@ from constants import (
     COL_BLACK, COL_PLAYER, COL_ENEMY, COL_ASTEROID, COL_HUD_BG,
 )
 from core.world import World
+from core.fog import FogMap
+from core.render_filter import should_draw_entity
 from entities.ship import CombatShip, MiningShip, BuilderShip
 from entities.building import Mothership, Turret, MiningStation
 from entities.asteroid import Asteroid
@@ -43,8 +45,10 @@ def _radius_of(entity):
     return _UNIT_RADII.get(size, 8)
 
 
-def _draw_entities(surface, world, cam_x, cam_y, selection):
+def _draw_entities(surface, world, fog, cam_x, cam_y, selection):
     for e in world.entities:
+        if not should_draw_entity(e, fog):
+            continue
         wx = int(e.pos.x - cam_x)
         wy = int(e.pos.y - cam_y)
         if -30 > wx or wx > SCREEN_WIDTH + 30:
@@ -157,6 +161,7 @@ def main():
     font  = pygame.font.SysFont("monospace", 14)
 
     world = build_test_world()
+    fog   = FogMap(MAP_WIDTH, MAP_HEIGHT)
 
     # Camera (top-left world coordinate)
     cam_x, cam_y = 200.0, 200.0
@@ -274,6 +279,11 @@ def main():
                 else:
                     e.pos += direction.normalize() * spd * dt
 
+        # ── Fog update ────────────────────────────────────────────
+        player_units = world.entities_for_team(0)
+        fog.update(player_units)
+        fog.reveal_asteroids(world.asteroids)
+
         # ── Draw ──────────────────────────────────────────────────
         screen.fill((5, 5, 15))
 
@@ -281,7 +291,10 @@ def main():
         border = pygame.Rect(-cam_x, -cam_y, MAP_WIDTH, MAP_HEIGHT)
         pygame.draw.rect(screen, (30, 30, 50), border, 2)
 
-        _draw_entities(screen, world, cam_x, cam_y, selection)
+        _draw_entities(screen, world, fog, cam_x, cam_y, selection)
+
+        # Fog overlay (after entities, before HUD)
+        fog.draw(screen, (cam_x, cam_y))
 
         if drag_rect and drag_rect.width > 2 and drag_rect.height > 2:
             s = pygame.Surface((drag_rect.width, drag_rect.height), pygame.SRCALPHA)
