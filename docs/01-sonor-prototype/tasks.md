@@ -84,7 +84,7 @@
 
 先序列確立 ship.py 子類介面（避免平行修改同檔衝突）：
 
-- [ ] Task 4.1: 確認 `MiningShip` 完整 state machine 屬性（`state ∈ {IDLE, MOVING_TO_AST, MINING, MOVING_TO_BASE, COLLECTING_STATION}`）與 `BuilderShip` 屬性（`state ∈ {IDLE, MOVING_TO_SITE, BUILDING, WAITING_RESOURCES}`），補全至 `entities/ship.py`（只屬性，邏輯由 system 處理）
+- [x] Task 4.1: 確認 `MiningShip` 完整 state machine 屬性（`state ∈ {IDLE, MOVING_TO_AST, MINING, MOVING_TO_BASE, COLLECTING_STATION}`）與 `BuilderShip` 屬性（`state ∈ {IDLE, MOVING_TO_SITE, BUILDING, WAITING_RESOURCES}`），補全至 `entities/ship.py`（只屬性，邏輯由 system 處理）
 
 ### 🔀 可平行工作線
 
@@ -94,10 +94,10 @@
 > 介面契約：`MiningSystem.update(world: World, dt: float)` → 驅動所有 MiningShip state machine；`Asteroid.is_attached_by(ship)` flag；`MiningStation.buffer` 增減
 > 驗證方式：`pytest tests/test_mining.py` 全過（至少 10 個 test case 覆蓋下方 Red task）
 
-- [ ] Task 4.2: 撰寫 `MiningSystem` 測試（attach 流程、MINE_RATE 每秒 10、cargo 滿→MOVING_TO_BASE、路過站 80px 取礦、站無船時自動採礦 5/s、站有船時停止、buffer 上限 500） (Red)
-- [ ] Task 4.3: 實作 `MiningSystem`（採礦、cargo 管理、返回母艦路徑、station buffer 邏輯）(Green)
-- [ ] Task 4.4: 撰寫 `Asteroid.reveal` 測試（`FogMap.is_visible` 為 True 或被 SonarHit 命中 → `revealed=True`；revealed 後 FogMap 加入 `revealed_positions`） (Red)
-- [ ] Task 4.5: 實作小行星 reveal 邏輯（`MiningSystem.update()` 中每 frame 檢查視野；整合 SonarHit 命中回調）(Green)
+- [x] Task 4.2: 撰寫 `MiningSystem` 測試（attach 流程、MINE_RATE 每秒 10、cargo 滿→MOVING_TO_BASE、路過站 80px 取礦、站無船時自動採礦 5/s、站有船時停止、buffer 上限 500） (Red)
+- [x] Task 4.3: 實作 `MiningSystem`（採礦、cargo 管理、返回母艦路徑、station buffer 邏輯）(Green)
+- [x] Task 4.4: 撰寫 `Asteroid.reveal` 測試（`FogMap.is_visible` 為 True 或被 SonarHit 命中 → `revealed=True`；revealed 後 FogMap 加入 `revealed_positions`） (Red)
+- [x] Task 4.5: 實作小行星 reveal 邏輯（`MiningSystem.update()` 中每 frame 檢查視野；整合 SonarHit 命中回調）(Green)
 
 **[B] BuildSystem + BuildQueue** — `isolation: worktree`
 > 範圍：`systems/build.py`、`entities/building.py`（MiningStation 的 `attached_asteroid` 設定）
@@ -105,17 +105,17 @@
 > 介面契約：`BuildQueue.enqueue(unit_type, cost, resources) -> bool`；`BuildQueue.update(dt) -> Unit | None`；`BuildSystem.update(world, dt)` → 驅動 BuilderShip state machine
 > 驗證方式：`pytest tests/test_build.py` 全過
 
-- [ ] Task 4.6: 撰寫 `BuildQueue` 測試（2 條序列各自獨立推進、進度計時到 build_time、完成產出 Unit、佇列上限 4、資源不足拒絕） (Red)
-- [ ] Task 4.7: 實作 `BuildQueue` + 母艦持有 2 個實例 (`systems/build.py`)(Green)
-- [ ] Task 4.8: 撰寫 `BuildSystem` 測試（BuilderShip MOVING_TO_SITE→BUILDING、施工進度 dt 累積、HP=0 進度歸零資源不退還、WAITING_RESOURCES 等待資源、完成後建物 add 到 world） (Red)
-- [ ] Task 4.9: 實作 `BuildSystem`（建造船 state machine、施工進度、建物完成生效）(Green)
-- [ ] Task 4.10: 撰寫 `MiningStation` attach 測試（施工完成後自動 attach 最近小行星 ≤ 150px；超出範圍時 attached_asteroid=None 且不採礦） (Red)
-- [ ] Task 4.11: 實作 `MiningStation` 自動 attach 邏輯（在 `BuildSystem` 建物完成時觸發）(Green)
+- [x] Task 4.6: 撰寫 `BuildQueue` 測試（2 條序列各自獨立推進、進度計時到 build_time、完成產出 Unit、佇列上限 4、資源不足拒絕） (Red)
+- [x] Task 4.7: 實作 `BuildQueue` + 母艦持有 2 個實例 (`systems/build.py`)(Green)
+- [x] Task 4.8: 撰寫 `BuildSystem` 測試（BuilderShip MOVING_TO_SITE→BUILDING、施工進度 dt 累積、HP=0 進度歸零資源不退還、WAITING_RESOURCES 等待資源、完成後建物 add 到 world） (Red)
+- [x] Task 4.9: 實作 `BuildSystem`（建造船 state machine、施工進度、建物完成生效）(Green)
+- [x] Task 4.10: 撰寫 `MiningStation` attach 測試（施工完成後自動 attach 最近小行星 ≤ 150px；超出範圍時 attached_asteroid=None 且不採礦） (Red)
+- [x] Task 4.11: 實作 `MiningStation` 自動 attach 邏輯（在 `BuildSystem` 建物完成時觸發）(Green)
 
 ### 🔗 匯合點
 > 驗證方式：`pytest tests/test_mining.py tests/test_build.py` 全過；hand test：右鍵指派採礦船→採礦→回母艦；從面板生產建造船→施工→採礦站完工
 
-- [ ] Task 4.12: 合併 [A]、[B] 分支，解決衝突；整合 `MiningSystem` + `BuildSystem` 到主迴圈 update；wiring 右鍵點擊小行星→指派採礦船、右鍵地圖→建造船移動指令
+- [x] Task 4.12: 合併 [A]、[B] 分支，解決衝突；整合 `MiningSystem` + `BuildSystem` 到主迴圈 update；wiring 右鍵點擊小行星→指派採礦船、右鍵地圖→建造船移動指令
 
 ---
 

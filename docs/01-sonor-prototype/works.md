@@ -81,3 +81,36 @@ DARK 區域用不透明黑（alpha=255），SHROUD 用 alpha=160 的黑色半透
 - `tests/test_sonar_fx.py`: 14 passed
 - `tests/test_minimap.py`: 17 passed
 - M1+M2+M3 合計：**143 passed, 0 failed**
+
+---
+
+## Milestone 4: 採礦 + 建造系統（完成）
+
+### 決策記錄
+
+**MiningSystem 獨立 system class**
+採礦邏輯集中在 `systems/mining.py`，entity 只持有狀態（state, cargo, assigned_asteroid），邏輯與資料分離。BuildSystem 同理。
+
+**Station 採礦：ship 在場就停**
+`Asteroid.has_attached_ship()` 是判斷條件。Station 不需要知道哪艘船，只需知道「有沒有船在這顆礦上」——讓 Asteroid 持有 `_attached_ships` list 最自然。
+
+**Station 收礦：MOVING_TO_BASE 途中自動掃過**
+MiningShip 在 MOVING_TO_BASE 狀態移動時，`_check_station_collect()` 每 frame 檢查 80px 內是否有 buffer > 0 的 station。不需要額外狀態——途中自動撈。
+
+**reveal_by_hits 掛在 MiningSystem**
+Asteroid reveal 邏輯與採礦系統耦合最緊（誰去採礦、誰知道礦的位置），且 hit radius=40px 是估算值，不需要精確匹配。主迴圈每 frame 呼叫一次。
+
+**BuildSystem 完工後自動 attach**
+MiningStation 完工時，BuildSystem 立刻掃描 STATION_ATTACH_RADIUS (150px) 內最近小行星。這個邏輯放在 BuildSystem._complete() 比放在 MiningStation.__init__ 更清晰——建物初始化不應有世界查詢副作用。
+
+**STATION_BUILD_TIME、TURRET_BUILD_TIME 加入 constants.py**
+M4 前 constants.py 缺少建造時間。補上 STATION_BUILD_TIME=20s、TURRET_BUILD_TIME=30s。
+
+**右鍵指令分流**
+右鍵點擊：若點到 Asteroid（30px 內）→ 指派選取的 MiningShip；若點到空地 → BuilderShip 設 assigned_target + building_type="MiningStation"；其他船（CombatShip）走原有的 _target_pos 移動。
+
+### 測試結果
+- `tests/test_mining.py`: 14 passed
+- `tests/test_asteroid_reveal.py`: 8 passed
+- `tests/test_build.py`: 18 passed
+- M1+M2+M3+M4 合計：**183 passed, 0 failed**

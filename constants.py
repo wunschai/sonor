@@ -48,12 +48,14 @@ TURRET_DAMAGE       = 20
 TURRET_FIRE_RATE    = 2.0
 TURRET_ATTACK_RANGE = 200
 TURRET_COST         = 200
+TURRET_BUILD_TIME   = 30   # sec
 
 STATION_HP              = 300
 STATION_COST            = 150
 STATION_MINE_RATE       = 5      # minerals/sec
 STATION_BUFFER_CAP      = 500
 STATION_ATTACH_RADIUS   = 150    # px, must be within to auto-attach
+STATION_BUILD_TIME      = 20   # sec
 STATION_COLLECT_RADIUS  = 80     # px, mining ship picks up buffer
 
 # ─── Mining ──────────────────────────────────────────────────────

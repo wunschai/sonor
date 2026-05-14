@@ -18,6 +18,8 @@ from entities.building import Mothership, Turret, MiningStation
 from entities.asteroid import Asteroid
 from ui.sonar_fx import SonarFX
 from ui.minimap import Minimap
+from systems.mining import MiningSystem
+from systems.build import BuildSystem
 
 
 # ── Render helpers ────────────────────────────────────────────────
@@ -172,6 +174,10 @@ def main():
     passive   = PassiveDetector()
     sonar_hits: list = []   # accumulated contacts this frame
 
+    # Game systems
+    mining_sys = MiningSystem()
+    build_sys  = BuildSystem()
+
     # Camera (top-left world coordinate)
     cam_x, cam_y = 200.0, 200.0
 
@@ -211,10 +217,28 @@ def main():
 
                 elif event.button == 3:  # right click — move / command
                     wx, wy = _screen_to_world(mx, my, cam_x, cam_y)
+                    target_vec = pygame.Vector2(wx, wy)
+                    # Check if right-clicking an asteroid (assign mining ship)
+                    clicked_ast = None
+                    for e in world.entities:
+                        if isinstance(e, Asteroid) and e.pos.distance_to(target_vec) < 30:
+                            clicked_ast = e
+                            break
                     for e in selection:
-                        if hasattr(e, "_target_pos"):
-                            e._target_pos = pygame.Vector2(wx, wy)
-                            e.state = "MOVING_TO_SITE" if hasattr(e, "building_type") else "MOVING_TO_AST"
+                        if isinstance(e, MiningShip):
+                            if clicked_ast:
+                                e.assigned_asteroid = clicked_ast
+                                e.state = "MOVING_TO_AST"
+                            else:
+                                e.assigned_asteroid = None
+                                e._target_pos = target_vec
+                                e.state = "IDLE"
+                        elif isinstance(e, BuilderShip):
+                            e.assigned_target = target_vec
+                            e.building_type = "MiningStation"
+                            e.state = "MOVING_TO_SITE"
+                        elif hasattr(e, "_target_pos"):
+                            e._target_pos = target_vec
 
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1 and drag_start:
@@ -274,8 +298,10 @@ def main():
         cam_x = max(0, min(cam_x, MAP_WIDTH  - SCREEN_WIDTH))
         cam_y = max(0, min(cam_y, MAP_HEIGHT - SCREEN_HEIGHT))
 
-        # ── Simple unit movement ──────────────────────────────────
+        # ── Simple unit movement (CombatShip only) ───────────────
         for e in world.entities:
+            if isinstance(e, (MiningShip, BuilderShip)):
+                continue   # handled by their respective systems
             if hasattr(e, "_target_pos") and e._target_pos is not None:
                 spd = e.speed_mode.effective_speed(e.speed) if hasattr(e, "speed_mode") else e.speed
                 direction = e._target_pos - e.pos
@@ -287,6 +313,10 @@ def main():
                         e.state = "IDLE"
                 else:
                     e.pos += direction.normalize() * spd * dt
+
+        # ── Game systems ──────────────────────────────────────────
+        mining_sys.update(world, dt)
+        build_sys.update(world, dt)
 
         # ── Fog update ────────────────────────────────────────────
         player_units = world.entities_for_team(0)
@@ -320,6 +350,9 @@ def main():
         for h in passive_hits:
             sonar_fx.add_hit(h)
             sonar_hits.append(h)
+
+        # Reveal asteroids via sonar hits
+        mining_sys.reveal_by_hits(world, sonar_hits)
 
         # ── Draw ──────────────────────────────────────────────────
         screen.fill((5, 5, 15))
