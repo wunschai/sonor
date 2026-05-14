@@ -256,6 +256,7 @@ class TestEnemyAI:
         combat_sys = CombatSystem()
         passive = PassiveDetector()
 
+        enemy_ai._startup_timer = 0   # bypass startup delay for integration test
         assert enemy_ai.state == "idle"
         states_seen = {"idle"}
 

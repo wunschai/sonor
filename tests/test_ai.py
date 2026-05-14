@@ -38,12 +38,14 @@ class TestEnemyAIStates:
         ast = Asteroid(pos=(2600, 2600), size="M")
         w.add_entity(ast)
         ai = EnemyAI()
+        ai._startup_timer = 0   # bypass startup delay for unit test
         ai.update(w, 0.1)
         assert ai.state == "mining"
 
     def test_idle_stays_idle_without_asteroid(self):
         w, pm, em = _world_with_mothershipss()
         ai = EnemyAI()
+        ai._startup_timer = 0   # bypass startup delay for unit test
         ai.update(w, 0.1)
         # No asteroids → stays idle (or tries to mine with nothing)
         assert ai.state in ("idle", "mining")
@@ -53,6 +55,7 @@ class TestEnemyAIStates:
         ast = Asteroid(pos=(2600, 2600), size="M")
         w.add_entity(ast)
         ai = EnemyAI()
+        ai._startup_timer = 0   # bypass startup delay for unit test
         ai.update(w, 0.1)   # → mining
         # AI should have added a mining ship
         enemy_ships = [e for e in w.entities
@@ -66,6 +69,7 @@ class TestEnemyAIStates:
         ms.assigned_asteroid = ast
         w.add_entity(ast); w.add_entity(ms)
         ai = EnemyAI()
+        ai._startup_timer = 0   # bypass startup delay for unit test
         ai.state = "mining"
         ai.update(w, 0.1)
         assert ai.state == "building"
@@ -76,6 +80,7 @@ class TestEnemyAIStates:
             s = CombatShip(pos=(2700, 2700), size="S", team=TEAM_ENEMY)
             w.add_entity(s)
         ai = EnemyAI()
+        ai._startup_timer = 0   # bypass startup delay for unit test
         ai.state = "building"
         ai.update(w, 0.1)
         assert ai.state == "attacking"
@@ -86,6 +91,7 @@ class TestEnemyAIStates:
             s = CombatShip(pos=(2700, 2700), size="S", team=TEAM_ENEMY)
             w.add_entity(s)
         ai = EnemyAI()
+        ai._startup_timer = 0   # bypass startup delay for unit test
         ai.state = "attacking"
         ai.update(w, 0.1)
         # Ships should have a target set toward player
@@ -97,6 +103,7 @@ class TestEnemyAIStates:
         w, pm, em = _world_with_mothershipss()
         w.resources[TEAM_ENEMY] = 9999
         ai = EnemyAI()
+        ai._startup_timer = 0   # bypass startup delay for unit test
         ai.state = "building"
         ai.update(w, 0.1)
         # Enemy mothership should have something queued
@@ -109,4 +116,4 @@ class TestEnemyAIStates:
         w = World()
         w.resources[TEAM_ENEMY] = 500
         ai = EnemyAI()
-        ai.update(w, 0.1)   # no crash
+        ai.update(w, 0.1)   # no crash (still in startup timer)

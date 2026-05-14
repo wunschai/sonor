@@ -111,7 +111,7 @@ class ControlPanel:
             self._draw_build_queues(surface, unit)
 
     def _draw_build_queues(self, surface: pygame.Surface, ms: Mothership) -> None:
-        """Draw build queue progress bars at the bottom of the panel."""
+        """Draw build queue progress bars at the bottom of the panel (always shown)."""
         panel_h = surface.get_height()
         bar_w = 160
         bar_h = 8
@@ -121,22 +121,26 @@ class ControlPanel:
 
         for i, q in enumerate(ms.build_queues):
             if q.producing is None:
-                continue
-            total = getattr(q, "_current_build_time", 1.0)
-            if total <= 0:
-                total = 1.0
-            ratio = min(1.0, q.progress / total)
-            remaining = max(0.0, total - q.progress)
+                # Show idle queue so the player knows both queues exist
+                label = self._small_font.render(
+                    f"Q{i+1}: ——", True, (120, 120, 130))
+                surface.blit(label, (x, y - 1))
+            else:
+                total = getattr(q, "_current_build_time", 1.0)
+                if total <= 0:
+                    total = 1.0
+                ratio     = min(1.0, q.progress / total)
+                remaining = max(0.0, total - q.progress)
 
-            # White background bar
-            pygame.draw.rect(surface, (200, 200, 200), (x, y, bar_w, bar_h))
-            # Grey fill for progress
-            pygame.draw.rect(surface, (100, 160, 220), (x, y, int(bar_w * ratio), bar_h))
-            pygame.draw.rect(surface, (150, 150, 160), (x, y, bar_w, bar_h), 1)
+                # Background bar
+                pygame.draw.rect(surface, (200, 200, 200), (x, y, bar_w, bar_h))
+                # Progress fill
+                pygame.draw.rect(surface, (100, 160, 220), (x, y, int(bar_w * ratio), bar_h))
+                pygame.draw.rect(surface, (150, 150, 160), (x, y, bar_w, bar_h), 1)
 
-            label = self._small_font.render(
-                f"Q{i+1}: {q.producing}  {remaining:.1f}s", True, _COL_TEXT)
-            surface.blit(label, (x + bar_w + 6, y - 1))
+                label = self._small_font.render(
+                    f"Q{i+1}: {q.producing}  {remaining:.1f}s", True, _COL_TEXT)
+                surface.blit(label, (x + bar_w + 6, y - 1))
 
             y -= bar_h + 14
 
@@ -187,15 +191,21 @@ class ControlPanel:
 
     def _mothership_buttons(self, ms: Mothership) -> List[PanelButton]:
         """One produce-button per ship type per queue."""
-        from constants import SHIP_BUILD_COST, SHIP_BUILD_TIME, MINING_SHIP_COST, BUILDER_SHIP_COST
+        from constants import (
+            SHIP_BUILD_COST, SHIP_BUILD_TIME,
+            MINING_SHIP_COST, MINING_SHIP_BUILD_TIME,
+            BUILDER_SHIP_COST, BUILDER_SHIP_BUILD_TIME,
+        )
         buttons = []
         x = _BTN_PAD
 
-        # Queue selector buttons (simple: S / M / L combat ships + mining + builder)
+        # Queue selector buttons (S / M / L combat ships + mining + builder)
         produce_items = [
-            ("Combat S", "CombatShip_S", SHIP_BUILD_TIME["S"], SHIP_BUILD_COST["S"]),
-            ("Combat M", "CombatShip_M", SHIP_BUILD_TIME["M"], SHIP_BUILD_COST["M"]),
-            ("Combat L", "CombatShip_L", SHIP_BUILD_TIME["L"], SHIP_BUILD_COST["L"]),
+            ("Combat S", "CombatShip_S",  SHIP_BUILD_TIME["S"], SHIP_BUILD_COST["S"]),
+            ("Combat M", "CombatShip_M",  SHIP_BUILD_TIME["M"], SHIP_BUILD_COST["M"]),
+            ("Combat L", "CombatShip_L",  SHIP_BUILD_TIME["L"], SHIP_BUILD_COST["L"]),
+            ("Mining",   "MiningShip",    MINING_SHIP_BUILD_TIME,  MINING_SHIP_COST),
+            ("Builder",  "BuilderShip",   BUILDER_SHIP_BUILD_TIME, BUILDER_SHIP_COST),
         ]
 
         for label, unit_type, build_time, cost in produce_items:

@@ -27,8 +27,13 @@ class EnemyAI:
     def __init__(self):
         self.state = "idle"
         self._dispatched_miner = False
+        self._startup_timer = 60.0   # seconds before AI begins acting
 
     def update(self, world, dt: float) -> None:
+        if self._startup_timer > 0:
+            self._startup_timer -= dt
+            return
+
         em = self._enemy_mothership(world)
 
         if self.state == "idle":
@@ -57,12 +62,16 @@ class EnemyAI:
         enemy_miners = [e for e in world.entities
                         if isinstance(e, MiningShip) and e.team == TEAM_ENEMY]
         if not enemy_miners:
-            # Dispatch one mining ship
+            # Only dispatch if we can afford the mining ship
+            resources = world.resources.get(TEAM_ENEMY, 0)
+            if resources < MINING_SHIP_COST:
+                return
             ast = self._nearest_asteroid(em, world)
             miner = MiningShip(pos=em.pos, team=TEAM_ENEMY)
             if ast:
                 miner.assigned_asteroid = ast
                 miner.state = "MOVING_TO_AST"
+            world.resources[TEAM_ENEMY] = resources - MINING_SHIP_COST
             world.add_entity(miner)
         else:
             # Mining in progress → transition to building

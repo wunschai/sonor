@@ -25,6 +25,115 @@ from systems.combat import CombatSystem
 from ai.enemy import EnemyAI
 
 
+# ── Unit Roster (left panel) ──────────────────────────────────────
+
+class UnitRoster:
+    """Left-side scrollable list of all player units."""
+
+    PANEL_W = 180
+    ROW_H   = 28
+
+    # Short abbreviations for entity types
+    _ABBREV = {
+        "Mothership":    "MS",
+        "CombatShip":    None,   # handled per-size below
+        "MiningShip":    "MN",
+        "BuilderShip":   "BD",
+        "Turret":        "TU",
+        "MiningStation": "ST",
+    }
+
+    def __init__(self, panel_y_start: int = 0, panel_h: int = 0):
+        self._scroll       = 0
+        self._panel_y      = panel_y_start
+        self._panel_h      = panel_h
+        self._font         = pygame.font.SysFont("monospace", 12)
+
+    # ── helpers ───────────────────────────────────────────────────
+
+    @staticmethod
+    def _abbrev(entity) -> str:
+        name = type(entity).__name__
+        if name == "CombatShip":
+            size = getattr(entity, "size", "S")
+            return f"CS-{size}"
+        return UnitRoster._ABBREV.get(name, "??")
+
+    def _player_units(self, world):
+        return [e for e in world.entities
+                if not isinstance(e, Asteroid)
+                and hasattr(e, "team") and e.team == TEAM_PLAYER]
+
+    def in_roster(self, screen_pos) -> bool:
+        x, y = screen_pos
+        return (0 <= x < self.PANEL_W
+                and self._panel_y <= y < self._panel_y + self._panel_h)
+
+    # ── draw ──────────────────────────────────────────────────────
+
+    def draw(self, surface: pygame.Surface, world, selection: list) -> None:
+        units = self._player_units(world)
+        if not units:
+            return
+
+        # semi-transparent background
+        bg = pygame.Surface((self.PANEL_W, self._panel_h), pygame.SRCALPHA)
+        bg.fill((10, 12, 20, 200))
+        surface.blit(bg, (0, self._panel_y))
+
+        visible = self._panel_h // self.ROW_H
+        start   = max(0, min(self._scroll, max(0, len(units) - visible)))
+        self._scroll = start
+
+        for i, entity in enumerate(units[start: start + visible]):
+            ry = self._panel_y + i * self.ROW_H
+            selected = entity in selection
+            row_col  = (40, 80, 130) if selected else (20, 25, 35)
+            pygame.draw.rect(surface, row_col,
+                             (0, ry, self.PANEL_W, self.ROW_H - 1))
+
+            # abbreviation text
+            abbrev = self._abbrev(entity)
+            lbl    = self._font.render(abbrev, True, (210, 215, 220))
+            surface.blit(lbl, (4, ry + 4))
+
+            # HP bar (20 px wide, right side)
+            bar_x = self.PANEL_W - 24
+            bar_y = ry + 6
+            bar_w = 20
+            bar_h = 8
+            if hasattr(entity, "hp") and hasattr(entity, "max_hp") and entity.max_hp > 0:
+                ratio = max(0.0, entity.hp / entity.max_hp)
+                pygame.draw.rect(surface, (120, 0, 0),   (bar_x, bar_y, bar_w, bar_h))
+                pygame.draw.rect(surface, (0, 180, 0),   (bar_x, bar_y, int(bar_w * ratio), bar_h))
+                pygame.draw.rect(surface, (80, 80, 80),  (bar_x, bar_y, bar_w, bar_h), 1)
+
+            # state text (small, middle area)
+            state = getattr(entity, "state", None)
+            if state:
+                st_lbl = self._font.render(str(state)[:8], True, (140, 160, 140))
+                surface.blit(st_lbl, (50, ry + 4))
+
+    # ── click ─────────────────────────────────────────────────────
+
+    def handle_click(self, screen_pos, world, selection: list,
+                     shift_held: bool) -> list:
+        units = self._player_units(world)
+        x, y  = screen_pos
+        if not (0 <= x < self.PANEL_W):
+            return selection
+        row   = (y - self._panel_y) // self.ROW_H
+        idx   = self._scroll + row
+        if idx < 0 or idx >= len(units):
+            return selection
+        clicked = units[idx]
+        if shift_held:
+            if clicked in selection:
+                return [e for e in selection if e is not clicked]
+            return selection + [clicked]
+        return [clicked]
+
+
 # ── Render helpers ────────────────────────────────────────────────
 
 _UNIT_COLOURS = {
@@ -165,6 +274,7 @@ def _entities_in_rect(world, rect_world):
 def build_test_world() -> World:
     w = World()
     w.resources[TEAM_PLAYER] = 500
+    w.resources[TEAM_ENEMY]  = 200   # bootstrap: AI needs minerals to buy its first miner
 
     # Player mothership
     pm = Mothership(pos=(300, 300), team=TEAM_PLAYER)
@@ -227,6 +337,11 @@ def main():
     panel_surf = pygame.Surface((SCREEN_WIDTH, _PANEL_H), pygame.SRCALPHA)
     control_panel = ControlPanel(panel_y=_PANEL_Y)
 
+    # Unit Roster (left side, from HUD to panel top)
+    _ROSTER_Y = 30          # below HUD line
+    _ROSTER_H = _PANEL_Y - _ROSTER_Y
+    roster = UnitRoster(panel_y_start=_ROSTER_Y, panel_h=_ROSTER_H)
+
     # Camera (top-left world coordinate)
     cam_x, cam_y = 200.0, 200.0
 
@@ -274,9 +389,15 @@ def main():
                 if control_panel.in_panel(event.pos):
                     pass   # click inside panel area but missed all buttons — ignore
 
-                elif event.button == 1:   # left click — start selection
-                    drag_start = event.pos
-                    drag_rect  = None
+                elif event.button == 1:   # left click — start selection or roster
+                    if roster.in_roster(event.pos):
+                        shift_held = pygame.key.get_mods() & pygame.KMOD_SHIFT
+                        selection  = roster.handle_click(
+                            event.pos, world, selection, bool(shift_held))
+                        control_panel.set_selection(selection, world=world)
+                    else:
+                        drag_start = event.pos
+                        drag_rect  = None
 
                 elif event.button == 3:  # right click — move / command
                     wx, wy = _screen_to_world(mx, my, cam_x, cam_y)
@@ -332,7 +453,7 @@ def main():
                     control_panel.set_selection(selection, world=world)
 
             elif event.type == pygame.MOUSEMOTION:
-                if drag_start:
+                if drag_start and drag_start[0] >= UnitRoster.PANEL_W:
                     ex, ey = event.pos
                     x0 = min(drag_start[0], ex)
                     y0 = min(drag_start[1], ey)
@@ -399,6 +520,10 @@ def main():
                         world.add_entity(CombatShip(pos=spawn_pos, size="M", team=e.team))
                     elif result == "CombatShip_L":
                         world.add_entity(CombatShip(pos=spawn_pos, size="L", team=e.team))
+                    elif result == "MiningShip":
+                        world.add_entity(MiningShip(pos=spawn_pos, team=e.team))
+                    elif result == "BuilderShip":
+                        world.add_entity(BuilderShip(pos=spawn_pos, team=e.team))
 
             game_result = world.check_win_condition()
 
@@ -473,6 +598,9 @@ def main():
             pygame.draw.rect(screen, (100, 200, 255), drag_rect, 1)
 
         _draw_hud(screen, world, font)
+
+        # Unit roster (left side panel)
+        roster.draw(screen, world, selection)
 
         # Control panel (bottom strip)
         panel_surf.fill((0, 0, 0, 0))

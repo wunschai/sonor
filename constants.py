@@ -32,15 +32,17 @@ MOTHERSHIP_VISION = 250
 MOTHERSHIP_QUEUE_SLOTS = 4   # max per build queue
 MOTHERSHIP_QUEUES  = 2       # parallel build queues
 
-MINING_SHIP_HP    = 80
-MINING_SHIP_VISION = 100
-MINING_SHIP_SPEED  = 100
-MINING_SHIP_COST   = 50
+MINING_SHIP_HP         = 80
+MINING_SHIP_VISION     = 100
+MINING_SHIP_SPEED      = 100
+MINING_SHIP_COST       = 50
+MINING_SHIP_BUILD_TIME = 15   # sec
 
-BUILDER_SHIP_HP    = 80
-BUILDER_SHIP_VISION = 100
-BUILDER_SHIP_SPEED  = 90
-BUILDER_SHIP_COST   = 75
+BUILDER_SHIP_HP         = 80
+BUILDER_SHIP_VISION     = 100
+BUILDER_SHIP_SPEED      = 90
+BUILDER_SHIP_COST       = 75
+BUILDER_SHIP_BUILD_TIME = 20  # sec
 
 # ─── Buildings ───────────────────────────────────────────────────
 TURRET_HP           = 300
@@ -85,7 +87,7 @@ PASSIVE_VOL_L2 = 120   # 40 ≤ vol < 120 → level 2
 BOOST_SPEED_MULT = 1.8
 
 # ─── AI ──────────────────────────────────────────────────────────
-AI_ATTACK_THRESHOLD = 3   # combat ships before attacking
+AI_ATTACK_THRESHOLD = 5   # combat ships before attacking
 
 # ─── Colours ─────────────────────────────────────────────────────
 COL_BLACK        = (0,   0,   0)
