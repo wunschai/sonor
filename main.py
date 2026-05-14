@@ -188,11 +188,12 @@ def main():
     mining_sys  = MiningSystem()
     build_sys   = BuildSystem()
     combat_sys  = CombatSystem()
-    control_panel = ControlPanel()
 
     # Panel surface (bottom 160px strip)
     _PANEL_H = 160
+    _PANEL_Y = SCREEN_HEIGHT - _PANEL_H
     panel_surf = pygame.Surface((SCREEN_WIDTH, _PANEL_H), pygame.SRCALPHA)
+    control_panel = ControlPanel(panel_y=_PANEL_Y)
 
     # Camera (top-left world coordinate)
     cam_x, cam_y = 200.0, 200.0
@@ -238,7 +239,10 @@ def main():
                 pass   # consumed
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:   # left click — start selection
+                if control_panel.in_panel(event.pos):
+                    pass   # click inside panel area but missed all buttons — ignore
+
+                elif event.button == 1:   # left click — start selection
                     drag_start = event.pos
                     drag_rect  = None
 
@@ -268,7 +272,7 @@ def main():
                             e._target_pos = target_vec
 
             elif event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 1 and drag_start:
+                if event.button == 1 and drag_start and not control_panel.in_panel(event.pos):
                     ex, ey = event.pos
                     dx = abs(ex - drag_start[0])
                     dy = abs(ey - drag_start[1])

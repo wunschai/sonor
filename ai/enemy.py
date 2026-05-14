@@ -52,6 +52,8 @@ class EnemyAI:
             self._tick_mining(world, em)
 
     def _tick_mining(self, world, em) -> None:
+        if em is None:
+            return
         enemy_miners = [e for e in world.entities
                         if isinstance(e, MiningShip) and e.team == TEAM_ENEMY]
         if not enemy_miners:

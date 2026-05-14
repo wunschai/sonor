@@ -38,10 +38,11 @@ _BTN_Y   = 10
 class ControlPanel:
     """Renders a context-sensitive button strip for the current selection."""
 
-    def __init__(self):
+    def __init__(self, panel_y: int = 0):
         self.buttons: List[PanelButton] = []
         self._selection: list = []
         self._world = None
+        self._panel_y = panel_y   # screen-y where this panel is blitted
         self._font = pygame.font.SysFont("monospace", 13)
         self._small_font = pygame.font.SysFont("monospace", 11)
 
@@ -52,13 +53,20 @@ class ControlPanel:
         self._world = world
         self.buttons = self._build_buttons()
 
+    def in_panel(self, screen_pos) -> bool:
+        """Return True if a screen position falls inside the panel strip."""
+        return screen_pos[1] >= self._panel_y
+
     def handle_event(self, event: pygame.event.Event) -> bool:
         """Process a pygame event. Returns True if a button consumed it."""
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for btn in self.buttons:
-                if btn.rect.collidepoint(event.pos):
-                    btn.on_click()
-                    return True
+            # Translate screen coords to panel-local coords
+            local_pos = (event.pos[0], event.pos[1] - self._panel_y)
+            if local_pos[1] >= 0:   # click is inside the panel strip
+                for btn in self.buttons:
+                    if btn.rect.collidepoint(local_pos):
+                        btn.on_click()
+                        return True
         return False
 
     def draw(self, surface: pygame.Surface) -> None:
