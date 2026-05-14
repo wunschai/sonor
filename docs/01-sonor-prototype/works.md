@@ -46,3 +46,38 @@ DARK 區域用不透明黑（alpha=255），SHROUD 用 alpha=160 的黑色半透
 - `tests/test_fog.py`: 14 passed
 - `tests/test_fog_render.py`: 11 passed
 - M1+M2 合計：**77 passed, 0 failed**
+
+---
+
+## Milestone 3: 聲納系統（完成）
+
+### 決策記錄
+
+**`core/sonar.py` 集中三大聲納類別**
+`ActivePulse`、`SonarHit`（dataclass）、`PassiveDetector` 放在 `core/sonar.py`；`SonarController` 與 `SpeedMode` 留在 `entities/ship.py`（composition 掛在 ship 上）。分層明確：core 層處理物理計算，entity 層持有控制狀態。
+
+**ActivePulse 衰減用里程碑計數器**
+用 `_decay_milestone` 累加 `PULSE_DECAY_DIST`，避免每 frame 做除法取整數；while 迴圈處理單 frame 內跨越多個閾值的邊界狀況（高幀率下 dt 可能很小，問題不大，但正確性更重要）。
+
+**命中容差 30px**
+`check_hit` 的容差選 30px（≈ PULSE_SPEED × 0.15s），使得 60FPS 下脈衝環不會穿過小型目標而漏偵測。
+
+**SonarFX 用暫存 SRCALPHA Surface 繪製環**
+每個環和 hit 都畫在獨立的 temp surface 上再 blit，避免 `pygame.draw.circle` 不支援 alpha 的問題，同時能正確實現 fade out 效果。
+
+**Minimap 分離為獨立模組**
+`ui/minimap.py` 只接受 `world`、`sonar_hits` 參數，不依賴相機座標——因為小地圖顯示的是完整世界視圖而非相機可見區域。主迴圈傳入 `sonar_hits` 列表（本 frame 偵測到的所有接觸），minimap 自行過濾已過期的 hits。
+
+**主迴圈聲納整合順序**
+每 frame 的執行順序：
+1. SonarController.update() → 若返回 True 建立 ActivePulse 並加入 SonarFX
+2. 對現有 pulses 執行 check_hit → 新 SonarHit 同時加入 SonarFX 與當 frame 的 sonar_hits 列表
+3. SonarFX.update(dt) → 推進 pulse 半徑、過期移除
+4. PassiveDetector.detect() → 被動偵測，hits 加入兩處
+5. 渲染：entity → SonarFX.draw() → fog → minimap.draw()
+
+### 測試結果
+- `tests/test_sonar.py`: 35 passed
+- `tests/test_sonar_fx.py`: 14 passed
+- `tests/test_minimap.py`: 17 passed
+- M1+M2+M3 合計：**143 passed, 0 failed**

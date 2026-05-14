@@ -12,9 +12,12 @@ from constants import (
 from core.world import World
 from core.fog import FogMap
 from core.render_filter import should_draw_entity
+from core.sonar import ActivePulse, PassiveDetector
 from entities.ship import CombatShip, MiningShip, BuilderShip
 from entities.building import Mothership, Turret, MiningStation
 from entities.asteroid import Asteroid
+from ui.sonar_fx import SonarFX
+from ui.minimap import Minimap
 
 
 # ── Render helpers ────────────────────────────────────────────────
@@ -163,6 +166,12 @@ def main():
     world = build_test_world()
     fog   = FogMap(MAP_WIDTH, MAP_HEIGHT)
 
+    # Sonar subsystems
+    sonar_fx  = SonarFX()
+    minimap   = Minimap(map_w=MAP_WIDTH, map_h=MAP_HEIGHT, mm_w=200, mm_h=150)
+    passive   = PassiveDetector()
+    sonar_hits: list = []   # accumulated contacts this frame
+
     # Camera (top-left world coordinate)
     cam_x, cam_y = 200.0, 200.0
 
@@ -284,6 +293,34 @@ def main():
         fog.update(player_units)
         fog.reveal_asteroids(world.asteroids)
 
+        # ── Sonar update ──────────────────────────────────────────
+        sonar_hits = []
+
+        # Active sonar: tick SonarController, fire pulses
+        for e in world.entities:
+            if not hasattr(e, "sonar"):
+                continue
+            if e.sonar.update(dt):
+                pulse = ActivePulse(origin=(e.pos.x, e.pos.y), strength=2)
+                sonar_fx.add_pulse(pulse)
+
+        # Check hits against current pulses before advancing them
+        all_entities = list(world.entities)
+        for pulse in sonar_fx.pulses:
+            hits = pulse.check_hit(all_entities)
+            for h in hits:
+                sonar_fx.add_hit(h)
+                sonar_hits.append(h)
+        # Advance pulses and expire dead ones
+        sonar_fx.update(dt)
+
+        # Passive sonar: detect moving enemies
+        enemy_units = world.entities_for_team(1)
+        passive_hits = passive.detect(player_units, enemy_units)
+        for h in passive_hits:
+            sonar_fx.add_hit(h)
+            sonar_hits.append(h)
+
         # ── Draw ──────────────────────────────────────────────────
         screen.fill((5, 5, 15))
 
@@ -293,8 +330,18 @@ def main():
 
         _draw_entities(screen, world, fog, cam_x, cam_y, selection)
 
-        # Fog overlay (after entities, before HUD)
+        # Sonar FX overlay (on top of entities, below fog)
+        sonar_fx.draw(screen, (cam_x, cam_y))
+
+        # Fog overlay (after entities + sonar fx, before HUD)
         fog.draw(screen, (cam_x, cam_y))
+
+        # Minimap (bottom-right corner, above fog)
+        mm_x = SCREEN_WIDTH  - minimap.mm_w - 10
+        mm_y = SCREEN_HEIGHT - minimap.mm_h - 10
+        mm_surf = pygame.Surface((minimap.mm_w, minimap.mm_h), pygame.SRCALPHA)
+        minimap.draw(mm_surf, world, sonar_hits)
+        screen.blit(mm_surf, (mm_x, mm_y))
 
         if drag_rect and drag_rect.width > 2 and drag_rect.height > 2:
             s = pygame.Surface((drag_rect.width, drag_rect.height), pygame.SRCALPHA)

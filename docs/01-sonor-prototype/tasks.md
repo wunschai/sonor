@@ -41,14 +41,14 @@
 
 先序列確立核心資料結構：
 
-- [ ] Task 3.1: 撰寫 `SonarController` 測試（toggle on/off、timer 倒數、update() 返回 True 表應發射、關閉時不發射） (Red)
-- [ ] Task 3.2: 實作 `SonarController`（`core/sonar.py`）(Green)
-- [ ] Task 3.3: 撰寫 `SpeedMode` 測試（toggle、effective_speed 計算：普通=base、加速=base×1.8、音量計算使用 effective_speed） (Red)
-- [ ] Task 3.4: 實作 `SpeedMode`（整合到 ship.py，`effective_speed` property）(Green)
-- [ ] Task 3.5: 撰寫 `ActivePulse` 測試（擴散半徑隨 dt 增長、每 400px 衰減強度、強度 0 消亡、check_hit 偵測環碰到 entity） (Red)
-- [ ] Task 3.6: 實作 `ActivePulse` + `SonarHit` dataclass (`core/sonar.py`)(Green)
-- [ ] Task 3.7: 撰寫 `PassiveDetector` 測試（PASSIVE_RADIUS 內偵測移動敵方、音量計算、強度映射、位置加噪、靜止不偵測、己方忽略） (Red)
-- [ ] Task 3.8: 實作 `PassiveDetector` (`core/sonar.py`)(Green)
+- [x] Task 3.1: 撰寫 `SonarController` 測試（toggle on/off、timer 倒數、update() 返回 True 表應發射、關閉時不發射） (Red)
+- [x] Task 3.2: 實作 `SonarController`（`core/sonar.py`）(Green)
+- [x] Task 3.3: 撰寫 `SpeedMode` 測試（toggle、effective_speed 計算：普通=base、加速=base×1.8、音量計算使用 effective_speed） (Red)
+- [x] Task 3.4: 實作 `SpeedMode`（整合到 ship.py，`effective_speed` property）(Green)
+- [x] Task 3.5: 撰寫 `ActivePulse` 測試（擴散半徑隨 dt 增長、每 400px 衰減強度、強度 0 消亡、check_hit 偵測環碰到 entity） (Red)
+- [x] Task 3.6: 實作 `ActivePulse` + `SonarHit` dataclass (`core/sonar.py`)(Green)
+- [x] Task 3.7: 撰寫 `PassiveDetector` 測試（PASSIVE_RADIUS 內偵測移動敵方、音量計算、強度映射、位置加噪、靜止不偵測、己方忽略） (Red)
+- [x] Task 3.8: 實作 `PassiveDetector` (`core/sonar.py`)(Green)
 
 ### 🔀 可平行工作線
 
@@ -58,8 +58,8 @@
 > 介面契約：`SonarFX.add_pulse(pulse: ActivePulse)`、`SonarFX.add_hit(hit: SonarHit)`、`SonarFX.draw(surface: pygame.Surface, camera_offset: tuple)`
 > 驗證方式：`pytest tests/test_sonar_fx.py`（fade 計時正確、強度 1/2/3 對應線寬 1/2/3px、pulse 環半徑隨 age 增長）
 
-- [ ] Task 3.9: 撰寫 `SonarFX` 測試（pulse 環繪製半徑、hit flash 強度→線寬、fade out 計時、多脈衝共存） (Red)
-- [ ] Task 3.10: 實作 `SonarFX`（pulse 環繪製、hit 輪廓閃光 fade 從清晰到模糊）(Green)
+- [x] Task 3.9: 撰寫 `SonarFX` 測試（pulse 環繪製半徑、hit flash 強度→線寬、fade out 計時、多脈衝共存） (Red)
+- [x] Task 3.10: 實作 `SonarFX`（pulse 環繪製、hit 輪廓閃光 fade 從清晰到模糊）(Green)
 
 **[B] 小地圖聲納光點** — `isolation: worktree`
 > 範圍：`ui/minimap.py`
@@ -67,13 +67,13 @@
 > 介面契約：`Minimap.draw(surface: pygame.Surface, world: World, sonar_hits: list[SonarHit])`；主動 hit→白點半徑 4/8/14px；被動 hit→橘點半徑 4/8/14px
 > 驗證方式：`pytest tests/test_minimap.py`（玩家白點、敵方紅點、主動白光點、被動橘光點、fade 計時、世界座標→小地圖座標映射）
 
-- [ ] Task 3.11: 撰寫 `Minimap` 測試（單位點渲染、聲納光點顏色/大小/fade、礦場綠色方塊、座標映射） (Red)
-- [ ] Task 3.12: 實作 `Minimap`（含單位點、聲納光點、礦場標記）(Green)
+- [x] Task 3.11: 撰寫 `Minimap` 測試（單位點渲染、聲納光點顏色/大小/fade、礦場綠色方塊、座標映射） (Red)
+- [x] Task 3.12: 實作 `Minimap`（含單位點、聲納光點、礦場標記）(Green)
 
 ### 🔗 匯合點
 > 驗證方式：合併後 `pytest tests/test_sonar*.py tests/test_minimap.py` 全過；hand test：開啟聲納→3 秒發射脈衝→碰小行星有閃光→小地圖有白點；移動測試艦艇→小地圖橘點出現
 
-- [ ] Task 3.13: 合併 [A]、[B] 分支；整合 `SonarController.update()` + `ActivePulse.check_hit()` + `PassiveDetector` 到主迴圈每 frame update；wiring `SonarFX` + `Minimap` 到渲染管線
+- [x] Task 3.13: 合併 [A]、[B] 分支；整合 `SonarController.update()` + `ActivePulse.check_hit()` + `PassiveDetector` 到主迴圈每 frame update；wiring `SonarFX` + `Minimap` 到渲染管線
 
 ---
 
