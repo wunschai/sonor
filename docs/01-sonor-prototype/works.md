@@ -114,3 +114,33 @@ M4 前 constants.py 缺少建造時間。補上 STATION_BUILD_TIME=20s、TURRET_
 - `tests/test_asteroid_reveal.py`: 8 passed
 - `tests/test_build.py`: 18 passed
 - M1+M2+M3+M4 合計：**183 passed, 0 failed**
+
+---
+
+## Milestone 5: 戰鬥 + 控制面板 + AI（完成）
+
+### 決策記錄
+
+**CombatSystem 使用 fire_timer 初始化為 1/fire_rate**
+原先 `_fire_timer = 0.0` 導致第一 frame 就開火。改為 `1/fire_rate` 讓所有武裝單位在部署後等一個完整週期才能射擊，行為更自然。Turret 同理。
+
+**World.check_win_condition 處理兩種死亡情境**
+母艦可能 (a) hp≤0 但還在 entities list（被 CombatSystem 殺死後移除，但條件先檢查到），或 (b) 已從 world 移除。兩種情境都要能偵測 → 分成兩個掃描段落：先掃 hp≤0，再掃「只有一方存在」。
+
+**ControlPanel 用 dataclass PanelButton**
+每個 button 是一個 dataclass，持有 `name`、`rect`、`on_click`（lambda）、`active`（lambda）。on_click 是閉包直接捕捉 unit 引用，避免需要「當前 selection」的全域狀態。
+
+**EnemyAI 極簡四態機**
+idle → mining（派採礦船）→ building（推演建造序列）→ attacking（所有戰艦衝向玩家母艦）。AI 不使用霧（全圖可見），只做序列狀態機，無路徑規劃。Prototype 等級夠用，未來可替換。
+
+**ControlPanel 與主 HUD 分離**
+ControlPanel 畫在獨立的 160px panel_surf 上，blit 到螢幕底部。原 `_draw_hud` 只保留頂部礦物 bar。這樣 ControlPanel 測試不需要 full screen context。
+
+**重啟按 R**
+game_result 不為 None 時顯示半透明 overlay + 勝敗文字 + "Press R to restart"。R 鍵重新呼叫 `_new_game()` 建立全新 world/fog/sonar_fx/enemy_ai。
+
+### 測試結果
+- `tests/test_combat.py`: 13 passed
+- `tests/test_control_panel.py`: 18 passed
+- `tests/test_ai.py`: 9 passed
+- 全 Milestone 合計：**223 passed, 0 failed**

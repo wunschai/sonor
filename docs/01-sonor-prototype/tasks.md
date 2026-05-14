@@ -126,10 +126,10 @@
 
 先序列完成戰鬥系統（AI 依賴）：
 
-- [ ] Task 5.1: 撰寫 `CombatSystem` 測試（進入 attack_range 自動鎖定最近敵方、傷害計算、fire_rate 計時、HP≤0 回傳死亡列表、砲塔攻擊、射程邊界） (Red)
-- [ ] Task 5.2: 實作 `CombatSystem` (`systems/combat.py`)(Green)
-- [ ] Task 5.3: 撰寫勝負條件測試（`World.check_win_condition()` → 敵母艦 HP≤0 返回 "player_win"、玩家母艦 HP≤0 返回 "player_lose"、其他返回 None） (Red)
-- [ ] Task 5.4: 實作勝負判定 + 勝/敗畫面（半透明覆蓋 + 文字「勝利！」/「失敗...」+ 按鍵重啟）(Green)
+- [x] Task 5.1: 撰寫 `CombatSystem` 測試（進入 attack_range 自動鎖定最近敵方、傷害計算、fire_rate 計時、HP≤0 回傳死亡列表、砲塔攻擊、射程邊界） (Red)
+- [x] Task 5.2: 實作 `CombatSystem` (`systems/combat.py`)(Green)
+- [x] Task 5.3: 撰寫勝負條件測試（`World.check_win_condition()` → 敵母艦 HP≤0 返回 "player_win"、玩家母艦 HP≤0 返回 "player_lose"、其他返回 None） (Red)
+- [x] Task 5.4: 實作勝負判定 + 勝/敗畫面（半透明覆蓋 + 文字「勝利！」/「失敗...」+ 按鍵重啟）(Green)
 
 ### 🔀 可平行工作線
 
@@ -139,9 +139,9 @@
 > 介面契約：`ControlPanel.set_selection(units: list[Unit])`；`ControlPanel.draw(surface: pygame.Surface)`；`ControlPanel.handle_event(event: pygame.Event)` → 呼叫對應 unit method（toggle/command）
 > 驗證方式：`pytest tests/test_control_panel.py`（各單位類型生成正確按鈕組、toggle dispatch、母艦序列面板按鈕、框選縮圖列表）
 
-- [ ] Task 5.5: 撰寫 `ControlPanel` 測試（`set_selection` 觸發對應按鈕組生成；CombatShip→聲納+速度、MiningShip→聲納+速度+礦場、Mothership→2 條序列面板、Turret→無按鈕；`handle_event` dispatch 到正確 method） (Red)
-- [ ] Task 5.6: 實作 `ControlPanel` 核心（動態按鈕生成、draw 到畫面下方 160px 區域、handle_event 分發）(Green)
-- [ ] Task 5.7: 實作各單位面板細節（聲納/速度 toggle 高亮、指派礦場等待狀態、建造選單展開、母艦生產列表含費用+時間、佇列縮圖列表最多 4 格、砲塔攻擊範圍圓繪製、採礦站 buffer 顯示）(Green)
+- [x] Task 5.5: 撰寫 `ControlPanel` 測試（`set_selection` 觸發對應按鈕組生成；CombatShip→聲納+速度、MiningShip→聲納+速度+礦場、Mothership→2 條序列面板、Turret→無按鈕；`handle_event` dispatch 到正確 method） (Red)
+- [x] Task 5.6: 實作 `ControlPanel` 核心（動態按鈕生成、draw 到畫面下方 160px 區域、handle_event 分發）(Green)
+- [x] Task 5.7: 實作各單位面板細節（聲納/速度 toggle 高亮、指派礦場等待狀態、建造選單展開、母艦生產列表含費用+時間、佇列縮圖列表最多 4 格、砲塔攻擊範圍圓繪製、採礦站 buffer 顯示）(Green)
 
 **[B] 敵方 AI 狀態機** — `isolation: worktree`
 > 範圍：`ai/enemy.py`
@@ -149,10 +149,10 @@
 > 介面契約：`EnemyAI.update(world: World, dt: float)`；`state ∈ {idle, mining, building, attacking}`；達到 `AI_ATTACK_THRESHOLD = 3` 艘戰艦後切換 attacking
 > 驗證方式：`pytest tests/test_ai.py`（狀態轉換邏輯：idle→mining→building→attacking；採礦船指派；建兵觸發；攻擊艦隊集結；全圖可見）
 
-- [ ] Task 5.8: 撰寫 `EnemyAI` 測試（狀態轉換條件、採礦船派發、建造序列使用、戰艦數量達門檻→攻擊、attack state 派出所有戰艦） (Red)
-- [ ] Task 5.9: 實作 `EnemyAI` 狀態機（mining→building→attacking 轉換、簡單艦隊前進邏輯）(Green)
+- [x] Task 5.8: 撰寫 `EnemyAI` 測試（狀態轉換條件、採礦船派發、建造序列使用、戰艦數量達門檻→攻擊、attack state 派出所有戰艦） (Red)
+- [x] Task 5.9: 實作 `EnemyAI` 狀態機（mining→building→attacking 轉換、簡單艦隊前進邏輯）(Green)
 
 ### 🔗 匯合點
 > 驗證方式：合併後 `pytest` 全套測試通過；完整 playtest：可選取所有單位→面板正確顯示功能按鈕；AI 主動派兵；擊沉敵母艦→勝利畫面；被打敗→失敗畫面
 
-- [ ] Task 5.10: 合併 [A]、[B]；整合 `ControlPanel` + `EnemyAI` 到主迴圈；`CombatSystem` 接入主 update；wiring `check_win_condition` 到主迴圈；全系統 end-to-end 手動測試
+- [x] Task 5.10: 合併 [A]、[B]；整合 `ControlPanel` + `EnemyAI` 到主迴圈；`CombatSystem` 接入主 update；wiring `check_win_condition` 到主迴圈；全系統 end-to-end 手動測試

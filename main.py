@@ -18,8 +18,11 @@ from entities.building import Mothership, Turret, MiningStation
 from entities.asteroid import Asteroid
 from ui.sonar_fx import SonarFX
 from ui.minimap import Minimap
+from ui.control_panel import ControlPanel
 from systems.mining import MiningSystem
 from systems.build import BuildSystem
+from systems.combat import CombatSystem
+from ai.enemy import EnemyAI
 
 
 # ── Render helpers ────────────────────────────────────────────────
@@ -67,25 +70,29 @@ def _draw_entities(surface, world, fog, cam_x, cam_y, selection):
             pygame.draw.circle(surface, (255, 255, 0), (wx, wy), r + 3, 2)
 
 
-def _draw_hud(surface, world, selection, font):
+def _draw_hud(surface, world, font):
     # Resource bar
     res = world.resources[TEAM_PLAYER]
     txt = font.render(f"Minerals: {res}", True, (220, 220, 220))
     surface.blit(txt, (10, 10))
 
-    # Selection info strip
-    if selection:
-        panel_rect = pygame.Rect(0, SCREEN_HEIGHT - 80, SCREEN_WIDTH, 80)
-        pygame.draw.rect(surface, COL_HUD_BG, panel_rect)
-        e = selection[0]
-        name = type(e).__name__
-        info = f"{name}"
-        if hasattr(e, "hp"):
-            info += f"  HP: {e.hp}/{e.max_hp}"
-        if hasattr(e, "size"):
-            info += f"  [{e.size}]"
-        txt = font.render(info, True, (220, 220, 220))
-        surface.blit(txt, (10, SCREEN_HEIGHT - 65))
+
+def _draw_win_screen(surface, result, font_big):
+    overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 160))
+    surface.blit(overlay, (0, 0))
+    if result == "player_win":
+        msg = "VICTORY!"
+        col = (80, 255, 100)
+    else:
+        msg = "DEFEAT..."
+        col = (255, 80, 80)
+    txt = font_big.render(msg, True, col)
+    surface.blit(txt, (SCREEN_WIDTH // 2 - txt.get_width() // 2,
+                       SCREEN_HEIGHT // 2 - txt.get_height() // 2 - 20))
+    sub = font_big.render("Press R to restart  |  ESC to quit", True, (200, 200, 200))
+    surface.blit(sub, (SCREEN_WIDTH // 2 - sub.get_width() // 2,
+                       SCREEN_HEIGHT // 2 + 30))
 
 
 # ── Input helpers ─────────────────────────────────────────────────
@@ -163,20 +170,29 @@ def main():
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Sonor")
     clock = pygame.time.Clock()
-    font  = pygame.font.SysFont("monospace", 14)
+    font      = pygame.font.SysFont("monospace", 14)
+    font_big  = pygame.font.SysFont("monospace", 36)
 
-    world = build_test_world()
-    fog   = FogMap(MAP_WIDTH, MAP_HEIGHT)
+    def _new_game():
+        w = build_test_world()
+        return w, FogMap(MAP_WIDTH, MAP_HEIGHT), SonarFX(), EnemyAI()
+
+    world, fog, sonar_fx, enemy_ai = _new_game()
 
     # Sonar subsystems
-    sonar_fx  = SonarFX()
     minimap   = Minimap(map_w=MAP_WIDTH, map_h=MAP_HEIGHT, mm_w=200, mm_h=150)
     passive   = PassiveDetector()
     sonar_hits: list = []   # accumulated contacts this frame
 
     # Game systems
-    mining_sys = MiningSystem()
-    build_sys  = BuildSystem()
+    mining_sys  = MiningSystem()
+    build_sys   = BuildSystem()
+    combat_sys  = CombatSystem()
+    control_panel = ControlPanel()
+
+    # Panel surface (bottom 160px strip)
+    _PANEL_H = 160
+    panel_surf = pygame.Surface((SCREEN_WIDTH, _PANEL_H), pygame.SRCALPHA)
 
     # Camera (top-left world coordinate)
     cam_x, cam_y = 200.0, 200.0
@@ -185,6 +201,8 @@ def main():
     selection: list = []
     drag_start = None   # screen pos where drag began
     drag_rect  = None   # current drag rect (screen coords)
+
+    game_result = None   # "player_win" | "player_lose" | None
 
     running = True
     while running:
@@ -199,6 +217,11 @@ def main():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
+                if event.key == pygame.K_r and game_result is not None:
+                    # Restart
+                    world, fog, sonar_fx, enemy_ai = _new_game()
+                    selection = []; game_result = None
+                    control_panel.set_selection([])
                 # Sonar toggle for selection
                 if event.key == pygame.K_s:
                     for e in selection:
@@ -209,6 +232,10 @@ def main():
                     for e in selection:
                         if hasattr(e, "speed_mode"):
                             e.speed_mode.toggle()
+
+            # Pass events to control panel first
+            if control_panel.handle_event(event):
+                pass   # consumed
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:   # left click — start selection
@@ -266,6 +293,7 @@ def main():
                         selection = _entities_in_rect(world, wr)
                     drag_start = None
                     drag_rect  = None
+                    control_panel.set_selection(selection)
 
             elif event.type == pygame.MOUSEMOTION:
                 if drag_start:
@@ -315,8 +343,12 @@ def main():
                     e.pos += direction.normalize() * spd * dt
 
         # ── Game systems ──────────────────────────────────────────
-        mining_sys.update(world, dt)
-        build_sys.update(world, dt)
+        if game_result is None:
+            mining_sys.update(world, dt)
+            build_sys.update(world, dt)
+            combat_sys.update(world, dt)
+            enemy_ai.update(world, dt)
+            game_result = world.check_win_condition()
 
         # ── Fog update ────────────────────────────────────────────
         player_units = world.entities_for_team(0)
@@ -382,7 +414,17 @@ def main():
             screen.blit(s, drag_rect.topleft)
             pygame.draw.rect(screen, (100, 200, 255), drag_rect, 1)
 
-        _draw_hud(screen, world, selection, font)
+        _draw_hud(screen, world, font)
+
+        # Control panel (bottom strip)
+        panel_surf.fill((0, 0, 0, 0))
+        control_panel.draw(panel_surf)
+        screen.blit(panel_surf, (0, SCREEN_HEIGHT - _PANEL_H))
+
+        # Win/lose overlay
+        if game_result is not None:
+            _draw_win_screen(screen, game_result, font_big)
+
         pygame.display.flip()
 
     pygame.quit()

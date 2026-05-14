@@ -98,4 +98,4 @@ class Turret(Unit):
         self.damage = TURRET_DAMAGE
         self.fire_rate = float(TURRET_FIRE_RATE)
         self.attack_range = float(TURRET_ATTACK_RANGE)
-        self._fire_timer = 0.0
+        self._fire_timer = 1.0 / TURRET_FIRE_RATE

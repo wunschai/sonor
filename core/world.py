@@ -51,8 +51,23 @@ class World:
     def check_win_condition(self):
         """Returns 'player_win', 'player_lose', or None."""
         from entities.building import Mothership
-        for e in self.entities:
-            if isinstance(e, Mothership):
-                if e.hp <= 0:
-                    return "player_win" if e.team == TEAM_ENEMY else "player_lose"
+        player_ms = [e for e in self.entities
+                     if isinstance(e, Mothership) and e.team == TEAM_PLAYER]
+        enemy_ms  = [e for e in self.entities
+                     if isinstance(e, Mothership) and e.team == TEAM_ENEMY]
+
+        # Dead mothership still in world
+        for e in player_ms:
+            if e.hp <= 0:
+                return "player_lose"
+        for e in enemy_ms:
+            if e.hp <= 0:
+                return "player_win"
+
+        # Mothership removed from world entirely
+        if player_ms and not enemy_ms:
+            return "player_win"
+        if enemy_ms and not player_ms:
+            return "player_lose"
+
         return None

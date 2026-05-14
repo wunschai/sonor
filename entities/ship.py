@@ -64,7 +64,7 @@ class CombatShip(Unit):
         self.sonar_strength = SHIP_SONAR_STR[size]
         self.sonar = SonarController()
         self.speed_mode = SpeedMode()
-        self._fire_timer = 0.0   # time until next shot
+        self._fire_timer = 1.0 / self.fire_rate   # time until next shot
 
 
 class MiningShip(Unit):
