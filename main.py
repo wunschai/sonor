@@ -221,7 +221,7 @@ def main():
                     # Restart
                     world, fog, sonar_fx, enemy_ai = _new_game()
                     selection = []; game_result = None
-                    control_panel.set_selection([])
+                    control_panel.set_selection([], world=world)
                 # Sonar toggle for selection
                 if event.key == pygame.K_s:
                     for e in selection:
@@ -293,7 +293,7 @@ def main():
                         selection = _entities_in_rect(world, wr)
                     drag_start = None
                     drag_rect  = None
-                    control_panel.set_selection(selection)
+                    control_panel.set_selection(selection, world=world)
 
             elif event.type == pygame.MOUSEMOTION:
                 if drag_start:
@@ -312,8 +312,6 @@ def main():
             cam_x += CAMERA_SPEED * dt
         if keys[pygame.K_w] or (my < CAMERA_EDGE_MARGIN):
             cam_y -= CAMERA_SPEED * dt
-        if keys[pygame.K_s and 0]:   # WASD-only, S is sonar
-            pass
         if keys[pygame.K_DOWN] or (my > SCREEN_HEIGHT - CAMERA_EDGE_MARGIN - 80):
             cam_y += CAMERA_SPEED * dt
         if keys[pygame.K_LEFT]:
@@ -348,6 +346,24 @@ def main():
             build_sys.update(world, dt)
             combat_sys.update(world, dt)
             enemy_ai.update(world, dt)
+
+            # ── Mothership build queues ───────────────────────────────
+            for e in list(world.entities):
+                if not isinstance(e, Mothership):
+                    continue
+                for q in e.build_queues:
+                    result = q.update(dt)
+                    if result is None:
+                        continue
+                    # Spawn the produced unit near the mothership
+                    spawn_pos = (e.pos.x + 40, e.pos.y + 40)
+                    if result == "CombatShip_S":
+                        world.add_entity(CombatShip(pos=spawn_pos, size="S", team=e.team))
+                    elif result == "CombatShip_M":
+                        world.add_entity(CombatShip(pos=spawn_pos, size="M", team=e.team))
+                    elif result == "CombatShip_L":
+                        world.add_entity(CombatShip(pos=spawn_pos, size="L", team=e.team))
+
             game_result = world.check_win_condition()
 
         # ── Fog update ────────────────────────────────────────────
@@ -363,7 +379,8 @@ def main():
             if not hasattr(e, "sonar"):
                 continue
             if e.sonar.update(dt):
-                pulse = ActivePulse(origin=(e.pos.x, e.pos.y), strength=2)
+                strength = getattr(e, "sonar_strength", 1)
+                pulse = ActivePulse(origin=(e.pos.x, e.pos.y), strength=strength)
                 sonar_fx.add_pulse(pulse)
 
         # Check hits against current pulses before advancing them

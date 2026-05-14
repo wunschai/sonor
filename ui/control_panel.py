@@ -41,13 +41,15 @@ class ControlPanel:
     def __init__(self):
         self.buttons: List[PanelButton] = []
         self._selection: list = []
+        self._world = None
         self._font = pygame.font.SysFont("monospace", 13)
         self._small_font = pygame.font.SysFont("monospace", 11)
 
     # ── Public interface ──────────────────────────────────────────
 
-    def set_selection(self, units: list) -> None:
+    def set_selection(self, units: list, world=None) -> None:
         self._selection = list(units)
+        self._world = world
         self.buttons = self._build_buttons()
 
     def handle_event(self, event: pygame.event.Event) -> bool:
@@ -155,12 +157,11 @@ class ControlPanel:
         ]
 
         for label, unit_type, build_time, cost in produce_items:
-            resources = 9999   # placeholder — real wiring in main.py via world
             btn = PanelButton(
                 name=f"build_{unit_type}",
                 label=f"{label}\n${cost}",
                 rect=pygame.Rect(x, _BTN_Y + 20, _BTN_W, _BTN_H),
-                on_click=self._make_enqueue(ms, unit_type, build_time, cost),
+                on_click=self._make_enqueue(ms, unit_type, build_time, cost, self._world),
                 active=lambda: False,
             )
             buttons.append(btn)
@@ -169,9 +170,12 @@ class ControlPanel:
         return buttons
 
     @staticmethod
-    def _make_enqueue(ms: Mothership, unit_type: str, build_time: float, cost: int):
+    def _make_enqueue(ms: Mothership, unit_type: str, build_time: float, cost: int, world):
         def _enqueue():
+            resources = world.resources.get(ms.team, 0) if world else 9999
             for q in ms.build_queues:
-                if q.enqueue(unit_type, build_time, cost, resources=9999):
+                if q.enqueue(unit_type, build_time, cost, resources):
+                    if world:
+                        world.resources[ms.team] = max(0, resources - cost)
                     break
         return _enqueue

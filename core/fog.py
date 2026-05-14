@@ -85,41 +85,29 @@ class FogMap:
         sw = surface.get_width()
         sh = surface.get_height()
 
-        # World region visible through the camera window
         wx0 = max(0, cam_x)
         wy0 = max(0, cam_y)
         wx1 = min(self.width,  cam_x + sw)
         wy1 = min(self.height, cam_y + sh)
 
-        # Corresponding screen offsets
         sx0 = wx0 - cam_x
         sy0 = wy0 - cam_y
 
-        region = self._state[wy0:wy1, wx0:wx1]
+        region = self._state[wy0:wy1, wx0:wx1]   # shape: (h, w)
+        h, w = region.shape
 
-        # Build an RGBA pixel array for the fog overlay
-        fog_surf = pygame.Surface((wx1 - wx0, wy1 - wy0), pygame.SRCALPHA)
+        if w <= 0 or h <= 0:
+            return
 
-        # DARK → opaque black
-        dark_mask = (region == self.DARK)
-        if dark_mask.any():
-            px_array = pygame.PixelArray(fog_surf)
-            # Map numpy mask to pixel colour — iterate only non-zero rows
-            ys, xs = np.where(dark_mask)
-            for y, x in zip(ys, xs):
-                px_array[x, y] = fog_surf.map_rgb(0, 0, 0)
-            del px_array
+        fog_surf = pygame.Surface((w, h), pygame.SRCALPHA)
 
-        # SHROUD → semi-transparent black (alpha ~160)
-        shroud_mask = (region == self.SHROUD)
-        if shroud_mask.any():
-            sh_surf = pygame.Surface(fog_surf.get_size(), pygame.SRCALPHA)
-            ys, xs = np.where(shroud_mask)
-            px_array = pygame.PixelArray(sh_surf)
-            for y, x in zip(ys, xs):
-                px_array[x, y] = sh_surf.map_rgb(0, 0, 0)
-            del px_array
-            sh_surf.set_alpha(160)
-            fog_surf.blit(sh_surf, (0, 0))
+        # Build alpha channel: DARK=255, SHROUD=160, VISIBLE=0
+        alpha = np.zeros((h, w), dtype=np.uint8)
+        alpha[region == self.DARK]   = 255
+        alpha[region == self.SHROUD] = 160
+
+        # surfarray uses (x, y) indexing, region is (y, x) → transpose
+        pygame.surfarray.pixels_alpha(fog_surf)[:] = alpha.T
+        del alpha   # release lock
 
         surface.blit(fog_surf, (sx0, sy0))

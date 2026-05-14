@@ -70,8 +70,7 @@ class CombatShip(Unit):
 class MiningShip(Unit):
     """Harvests ore from asteroids and returns to mothership."""
 
-    STATES = ("IDLE", "MOVING_TO_AST", "MINING",
-              "MOVING_TO_BASE", "COLLECTING_STATION")
+    STATES = ("IDLE", "MOVING_TO_AST", "MINING", "MOVING_TO_BASE")
 
     def __init__(self, *, pos, team):
         super().__init__(

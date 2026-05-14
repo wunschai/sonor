@@ -6,7 +6,6 @@ from entities.ship import MiningShip
 from entities.building import Mothership, MiningStation
 from entities.asteroid import Asteroid
 from constants import (
-    TEAM_PLAYER,
     MINE_RATE, CARGO_CAP,
     STATION_MINE_RATE, STATION_BUFFER_CAP, STATION_COLLECT_RADIUS,
 )
@@ -20,11 +19,9 @@ class MiningSystem:
 
     def update(self, world, dt: float) -> None:
         # Collect key entities once per frame
-        motherships = [e for e in world.entities
-                       if isinstance(e, Mothership) and e.team == TEAM_PLAYER]
+        motherships = [e for e in world.entities if isinstance(e, Mothership)]
         stations    = [e for e in world.entities if isinstance(e, MiningStation)]
-        ships       = [e for e in world.entities
-                       if isinstance(e, MiningShip) and e.team == TEAM_PLAYER]
+        ships       = [e for e in world.entities if isinstance(e, MiningShip)]
 
         # ── Station auto-mine ─────────────────────────────────────
         for sta in stations:
@@ -45,6 +42,9 @@ class MiningSystem:
                     ship.state = "MOVING_TO_AST"
 
             elif ship.state == "MOVING_TO_AST":
+                if ship.assigned_asteroid is None:
+                    ship.state = "IDLE"
+                    continue
                 self._move_toward(ship, ship.assigned_asteroid.pos, dt)
                 if self._arrived(ship.pos, ship.assigned_asteroid.pos):
                     ship.assigned_asteroid.attach(ship)
@@ -72,8 +72,6 @@ class MiningSystem:
                 if self._arrived(ship.pos, ms.pos):
                     self._unload(ship, world)
 
-            elif ship.state == "COLLECTING_STATION":
-                pass   # handled by check_station_collect; transition back inline
 
     # ── Sonar reveal ─────────────────────────────────────────────
 

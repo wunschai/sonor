@@ -96,7 +96,10 @@ class PassiveDetector:
                     continue
 
                 # Noise volume = speed × size factor
-                speed  = getattr(enemy, "_current_speed", getattr(enemy, "speed", 0.0))
+                if hasattr(enemy, "speed_mode"):
+                    speed = enemy.speed_mode.effective_speed(enemy.speed)
+                else:
+                    speed = getattr(enemy, "speed", 0.0)
                 size   = getattr(enemy, "size", "S")
                 factor = SIZE_FACTORS.get(size, 1)
                 volume = speed * factor
