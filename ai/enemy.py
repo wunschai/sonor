@@ -122,7 +122,10 @@ class EnemyAI:
         existing = [e for e in world.entities
                     if isinstance(e, MiningShip) and e.team == TEAM_ENEMY]
         occupied = {m.assigned_asteroid for m in existing if m.assigned_asteroid}
-        free_asts = [a for a in world.asteroids if a not in occupied]
+        free_asts = sorted(
+            (a for a in world.asteroids if a not in occupied),
+            key=lambda a: a.pos.distance_to(em.pos),
+        )
         resources = world.resources.get(TEAM_ENEMY, 0)
 
         for ast in free_asts:

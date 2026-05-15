@@ -533,9 +533,12 @@ def main():
                         elif isinstance(e, BuilderShip):
                             e.assigned_target = target_vec
                             # Auto-detect: near asteroid → Station, elsewhere → Turret
-                            from constants import STATION_ATTACH_RADIUS
+                            # Build MiningStation only when clicking on/near the
+                            # asteroid body (visual radius ~6-16 px + 20 px tolerance)
+                            _AST_RADII = {"S": 6, "M": 10, "L": 16}
                             near_ast = any(
-                                ast.pos.distance_to(target_vec) <= STATION_ATTACH_RADIUS
+                                ast.pos.distance_to(target_vec)
+                                <= _AST_RADII.get(ast.size, 10) + 20
                                 for ast in world.asteroids
                             )
                             e.building_type = "MiningStation" if near_ast else "Turret"
