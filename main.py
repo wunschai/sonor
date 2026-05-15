@@ -2,12 +2,14 @@
 import pygame
 import sys
 import random
+import math
 
 from constants import (
     SCREEN_WIDTH, SCREEN_HEIGHT, MAP_WIDTH, MAP_HEIGHT, FPS,
     CAMERA_SPEED, CAMERA_EDGE_MARGIN,
     TEAM_PLAYER, TEAM_ENEMY,
     COL_BLACK, COL_PLAYER, COL_ENEMY, COL_ASTEROID, COL_HUD_BG,
+    STATION_BUILD_TIME, TURRET_BUILD_TIME,
 )
 from core.world import World
 from core.fog import FogMap
@@ -204,8 +206,12 @@ def _radius_of(entity):
     return _UNIT_RADII.get(size, 8)
 
 
+_BUILD_TIMES = {"MiningStation": STATION_BUILD_TIME, "Turret": TURRET_BUILD_TIME}
+_BUILD_ABBREV = {"MiningStation": "Station", "Turret": "Turret"}
+
+
 def _draw_unit_bars(surface, entity, sx, sy, radius):
-    """Draw HP bar (and cargo bar for mining ships) above the entity circle."""
+    """Draw HP bar (and secondary bars) above the entity circle."""
     if not hasattr(entity, "hp") or not hasattr(entity, "max_hp"):
         return
 
@@ -229,8 +235,20 @@ def _draw_unit_bars(surface, entity, sx, sy, radius):
         pygame.draw.rect(surface, (0, 0, 100), (bar_x, cargo_y, bar_w, bar_h))
         pygame.draw.rect(surface, (0, 120, 255), (bar_x, cargo_y, int(bar_w * cargo_ratio), bar_h))
 
+    # Build progress bar for BuilderShip in BUILDING state
+    if (type(entity).__name__ == "BuilderShip"
+            and getattr(entity, "state", None) == "BUILDING"
+            and hasattr(entity, "_build_progress")):
+        btype     = getattr(entity, "building_type", None)
+        total     = _BUILD_TIMES.get(btype, 1.0)
+        progress  = min(1.0, entity._build_progress / total) if total > 0 else 0.0
+        build_y   = bar_y + bar_h + 1
+        pygame.draw.rect(surface, (60, 40,  0),   (bar_x, build_y, bar_w, bar_h))
+        pygame.draw.rect(surface, (240, 180, 0),  (bar_x, build_y, int(bar_w * progress), bar_h))
+        pygame.draw.rect(surface, (160, 120, 0),  (bar_x, build_y, bar_w, bar_h), 1)
 
-def _draw_entities(surface, world, fog, cam_x, cam_y, selection):
+
+def _draw_entities(surface, world, fog, cam_x, cam_y, selection, font=None):
     for e in world.entities:
         if not should_draw_entity(e, fog):
             continue
@@ -251,6 +269,14 @@ def _draw_entities(surface, world, fog, cam_x, cam_y, selection):
             pygame.draw.circle(flash_surf, (255, 0, 0, 160), (r + 1, r + 1), r)
             surface.blit(flash_surf, (wx - r - 1, wy - r - 1))
         _draw_unit_bars(surface, e, wx, wy, r)
+        # Build label for BuilderShip in BUILDING state
+        if (font is not None
+                and type(e).__name__ == "BuilderShip"
+                and getattr(e, "state", None) == "BUILDING"):
+            btype  = getattr(e, "building_type", "")
+            label  = _BUILD_ABBREV.get(btype, btype)
+            lbl    = font.render(label, True, (240, 180, 0))
+            surface.blit(lbl, (wx - lbl.get_width() // 2, wy - r - 22))
 
 
 def _draw_hud(surface, world, font):
@@ -338,13 +364,27 @@ def build_test_world() -> World:
         s = CombatShip(pos=(2720 + i * 30, 2720), size="M", team=TEAM_ENEMY)
         w.add_entity(s)
 
-    # Asteroids
-    random.seed(42)
-    for _ in range(12):
-        pos = (random.randint(200, MAP_WIDTH - 200),
-               random.randint(200, MAP_HEIGHT - 200))
-        size = random.choice(("S", "M", "L"))
-        w.add_entity(Asteroid(pos=pos, size=size))
+    # Asteroids — zone-based placement for strategic depth
+    # Each zone: (center_x, center_y, scatter_radius, [(size, ...)])
+    _ZONES = [
+        (400,  400,  300, ["S", "M", "S"]),           # player safe zone
+        (2600, 2600, 300, ["S", "M", "S"]),           # enemy safe zone
+        (1500, 1500, 380, ["L", "M", "L", "M"]),      # center hotspot (high value)
+        (850,  750,  220, ["M", "M", "S"]),            # left-upper cluster
+        (2150, 2250, 220, ["M", "M", "S"]),            # right-lower cluster
+        (550,  2100, 260, ["S", "M"]),                 # far left-lower
+        (2450, 900,  260, ["S", "M"]),                 # far right-upper
+    ]
+    rng = random.Random(42)
+    for cx, cy, scatter, sizes in _ZONES:
+        for size in sizes:
+            angle  = rng.uniform(0, 6.283)
+            dist   = rng.uniform(60, scatter)
+            px     = int(cx + dist * math.cos(angle))
+            py     = int(cy + dist * math.sin(angle))
+            px     = max(150, min(MAP_WIDTH  - 150, px))
+            py     = max(150, min(MAP_HEIGHT - 150, py))
+            w.add_entity(Asteroid(pos=(px, py), size=size))
 
     return w
 
@@ -658,7 +698,7 @@ def main():
         border = pygame.Rect(-cam_x, -cam_y, MAP_WIDTH, MAP_HEIGHT)
         pygame.draw.rect(screen, (30, 30, 50), border, 2)
 
-        _draw_entities(screen, world, fog, cam_x, cam_y, selection)
+        _draw_entities(screen, world, fog, cam_x, cam_y, selection, font)
 
         # Fog overlay (covers unknown areas)
         fog.draw(screen, (cam_x, cam_y))
