@@ -22,6 +22,7 @@ from ui.control_panel import ControlPanel
 from systems.mining import MiningSystem
 from systems.build import BuildSystem
 from systems.combat import CombatSystem
+from systems.collision import resolve_separation, formation_offsets
 from ai.enemy import EnemyAI
 
 
@@ -408,6 +409,17 @@ def main():
                         if isinstance(e, Asteroid) and e.pos.distance_to(target_vec) < 30:
                             clicked_ast = e
                             break
+                    # Ships that will receive a plain move target get
+                    # formation offsets so they don't all stack on one point.
+                    _move_sel = [
+                        e for e in selection
+                        if (isinstance(e, MiningShip) and not clicked_ast)
+                        or (not isinstance(e, (MiningShip, BuilderShip))
+                            and hasattr(e, "_target_pos"))
+                    ]
+                    _offsets = formation_offsets(len(_move_sel))
+                    _offset_map = {id(e): off for e, off in zip(_move_sel, _offsets)}
+
                     for e in selection:
                         if isinstance(e, MiningShip):
                             if clicked_ast:
@@ -415,14 +427,16 @@ def main():
                                 e.state = "MOVING_TO_AST"
                             else:
                                 e.assigned_asteroid = None
-                                e._target_pos = target_vec
+                                e._target_pos = target_vec + _offset_map[id(e)]
                                 e.state = "IDLE"
                         elif isinstance(e, BuilderShip):
                             e.assigned_target = target_vec
                             e.building_type = "MiningStation"
                             e.state = "MOVING_TO_SITE"
                         elif hasattr(e, "_target_pos"):
-                            e._target_pos = target_vec
+                            e._target_pos = target_vec + _offset_map.get(
+                                id(e), pygame.Vector2(0, 0)
+                            )
 
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1 and drag_start and not control_panel.in_panel(event.pos):
@@ -503,6 +517,7 @@ def main():
             build_sys.update(world, dt)
             combat_sys.update(world, dt)
             enemy_ai.update(world, dt)
+            resolve_separation(world)
 
             # ── Mothership build queues ───────────────────────────────
             for e in list(world.entities):

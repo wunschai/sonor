@@ -110,8 +110,17 @@ class ControlPanel:
         if isinstance(unit, Mothership):
             self._draw_build_queues(surface, unit)
 
+    # Short display names for queue items
+    _QUEUE_ABBREV = {
+        "CombatShip_S": "CS",
+        "CombatShip_M": "CM",
+        "CombatShip_L": "CL",
+        "MiningShip":   "Mn",
+        "BuilderShip":  "Bu",
+    }
+
     def _draw_build_queues(self, surface: pygame.Surface, ms: Mothership) -> None:
-        """Draw build queue progress bars at the bottom of the panel (always shown)."""
+        """Draw build queue progress bars + pending items at the bottom of the panel."""
         panel_h = surface.get_height()
         bar_w = 160
         bar_h = 8
@@ -121,7 +130,6 @@ class ControlPanel:
 
         for i, q in enumerate(ms.build_queues):
             if q.producing is None:
-                # Show idle queue so the player knows both queues exist
                 label = self._small_font.render(
                     f"Q{i+1}: ——", True, (120, 120, 130))
                 surface.blit(label, (x, y - 1))
@@ -132,15 +140,28 @@ class ControlPanel:
                 ratio     = min(1.0, q.progress / total)
                 remaining = max(0.0, total - q.progress)
 
-                # Background bar
+                # Progress bar
                 pygame.draw.rect(surface, (200, 200, 200), (x, y, bar_w, bar_h))
-                # Progress fill
                 pygame.draw.rect(surface, (100, 160, 220), (x, y, int(bar_w * ratio), bar_h))
                 pygame.draw.rect(surface, (150, 150, 160), (x, y, bar_w, bar_h), 1)
 
+                abbrev = self._QUEUE_ABBREV.get(q.producing, q.producing)
                 label = self._small_font.render(
-                    f"Q{i+1}: {q.producing}  {remaining:.1f}s", True, _COL_TEXT)
+                    f"Q{i+1}: {abbrev}  {remaining:.1f}s", True, _COL_TEXT)
                 surface.blit(label, (x + bar_w + 6, y - 1))
+
+                # Pending items after the current one
+                px = x + bar_w + 80
+                for unit_type, _ in q.queue:
+                    ab = self._QUEUE_ABBREV.get(unit_type, unit_type[:2])
+                    box_w, box_h = 24, 14
+                    box_rect = pygame.Rect(px, y - 3, box_w, box_h)
+                    pygame.draw.rect(surface, (50, 70, 90), box_rect, border_radius=2)
+                    pygame.draw.rect(surface, _COL_BTN_BORDER, box_rect, 1, border_radius=2)
+                    t = self._small_font.render(ab, True, _COL_TEXT)
+                    surface.blit(t, (px + (box_w - t.get_width()) // 2,
+                                     y - 3 + (box_h - t.get_height()) // 2))
+                    px += box_w + 4
 
             y -= bar_h + 14
 
@@ -225,7 +246,10 @@ class ControlPanel:
     def _make_enqueue(ms: Mothership, unit_type: str, build_time: float, cost: int, world):
         def _enqueue():
             resources = world.resources.get(ms.team, 0) if world else 9999
-            for q in ms.build_queues:
+            # Pick the queue with fewest total items (producing + pending)
+            def _total(q):
+                return (1 if q.producing else 0) + len(q.queue)
+            for q in sorted(ms.build_queues, key=_total):
                 if q.enqueue(unit_type, build_time, cost, resources):
                     if world:
                         world.resources[ms.team] = max(0, resources - cost)
