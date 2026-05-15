@@ -45,10 +45,13 @@ class UnitRoster:
     }
 
     def __init__(self, panel_y_start: int = 0, panel_h: int = 0):
-        self._scroll       = 0
-        self._panel_y      = panel_y_start
-        self._panel_h      = panel_h
-        self._font         = pygame.font.SysFont("monospace", 12)
+        self._scroll          = 0
+        self._panel_y         = panel_y_start
+        self._panel_h         = panel_h
+        self._font            = pygame.font.SysFont("monospace", 12)
+        self._last_click_idx  = -1
+        self._last_click_tick = 0
+        self.camera_jump      = None   # set to entity on double-click
 
     # ── helpers ───────────────────────────────────────────────────
 
@@ -65,6 +68,24 @@ class UnitRoster:
                 if not isinstance(e, Asteroid)
                 and hasattr(e, "team") and e.team == TEAM_PLAYER]
 
+    def _grouped_rows(self, world):
+        """Return a flat list mixing string headers and entity objects."""
+        from entities.ship import CombatShip, MiningShip, BuilderShip
+        from entities.building import Mothership, MiningStation, Turret
+        all_units = self._player_units(world)
+        ships     = [e for e in all_units
+                     if isinstance(e, (CombatShip, MiningShip, BuilderShip))]
+        buildings = [e for e in all_units
+                     if isinstance(e, (Mothership, MiningStation, Turret))]
+        rows = []
+        if ships:
+            rows.append("Ships")
+            rows.extend(ships)
+        if buildings:
+            rows.append("Buildings")
+            rows.extend(buildings)
+        return rows
+
     def in_roster(self, screen_pos) -> bool:
         x, y = screen_pos
         return (0 <= x < self.PANEL_W
@@ -73,8 +94,8 @@ class UnitRoster:
     # ── draw ──────────────────────────────────────────────────────
 
     def draw(self, surface: pygame.Surface, world, selection: list) -> None:
-        units = self._player_units(world)
-        if not units:
+        rows = self._grouped_rows(world)
+        if not rows:
             return
 
         # semi-transparent background
@@ -83,11 +104,21 @@ class UnitRoster:
         surface.blit(bg, (0, self._panel_y))
 
         visible = self._panel_h // self.ROW_H
-        start   = max(0, min(self._scroll, max(0, len(units) - visible)))
+        start   = max(0, min(self._scroll, max(0, len(rows) - visible)))
         self._scroll = start
 
-        for i, entity in enumerate(units[start: start + visible]):
+        for i, row in enumerate(rows[start: start + visible]):
             ry = self._panel_y + i * self.ROW_H
+
+            if isinstance(row, str):
+                # Group header
+                pygame.draw.rect(surface, (15, 20, 35),
+                                 (0, ry, self.PANEL_W, self.ROW_H - 1))
+                hdr = self._font.render(f"── {row} ──", True, (100, 130, 170))
+                surface.blit(hdr, (4, ry + 6))
+                continue
+
+            entity  = row
             selected = entity in selection
             row_col  = (40, 80, 130) if selected else (20, 25, 35)
             pygame.draw.rect(surface, row_col,
@@ -119,15 +150,25 @@ class UnitRoster:
 
     def handle_click(self, screen_pos, world, selection: list,
                      shift_held: bool) -> list:
-        units = self._player_units(world)
-        x, y  = screen_pos
+        rows = self._grouped_rows(world)
+        x, y = screen_pos
         if not (0 <= x < self.PANEL_W):
             return selection
-        row   = (y - self._panel_y) // self.ROW_H
-        idx   = self._scroll + row
-        if idx < 0 or idx >= len(units):
+        row_i = self._scroll + (y - self._panel_y) // self.ROW_H
+        if row_i < 0 or row_i >= len(rows):
             return selection
-        clicked = units[idx]
+        item = rows[row_i]
+        if isinstance(item, str):
+            return selection   # clicked a header — no-op
+
+        clicked = item
+        # Double-click detection (within 400 ms on same entity)
+        now = pygame.time.get_ticks()
+        if self._last_click_idx == row_i and now - self._last_click_tick < 400:
+            self.camera_jump = clicked
+        self._last_click_idx  = row_i
+        self._last_click_tick = now
+
         if shift_held:
             if clicked in selection:
                 return [e for e in selection if e is not clicked]
@@ -324,6 +365,8 @@ def main():
 
     # Sonar subsystems
     minimap   = Minimap(map_w=MAP_WIDTH, map_h=MAP_HEIGHT, mm_w=200, mm_h=150)
+    _MM_X = SCREEN_WIDTH - 200 - 10   # minimap top-left screen x
+    _MM_Y = 10                         # minimap top-left screen y
     passive   = PassiveDetector()
     sonar_hits: list = []   # accumulated contacts this frame
 
@@ -390,12 +433,30 @@ def main():
                 if control_panel.in_panel(event.pos):
                     pass   # click inside panel area but missed all buttons — ignore
 
+                elif (event.button == 1
+                      and pygame.Rect(_MM_X, _MM_Y, minimap.mm_w, minimap.mm_h)
+                             .collidepoint(event.pos)):
+                    # Minimap click — centre camera on the clicked world position
+                    lx = event.pos[0] - _MM_X
+                    ly = event.pos[1] - _MM_Y
+                    cam_x = lx / minimap.mm_w * MAP_WIDTH  - SCREEN_WIDTH  // 2
+                    cam_y = ly / minimap.mm_h * MAP_HEIGHT - SCREEN_HEIGHT // 2
+                    cam_x = max(0, min(cam_x, MAP_WIDTH  - SCREEN_WIDTH))
+                    cam_y = max(0, min(cam_y, MAP_HEIGHT - SCREEN_HEIGHT))
+
                 elif event.button == 1:   # left click — start selection or roster
                     if roster.in_roster(event.pos):
                         shift_held = pygame.key.get_mods() & pygame.KMOD_SHIFT
                         selection  = roster.handle_click(
                             event.pos, world, selection, bool(shift_held))
                         control_panel.set_selection(selection, world=world)
+                        if roster.camera_jump:
+                            e = roster.camera_jump
+                            roster.camera_jump = None
+                            cam_x = e.pos.x - SCREEN_WIDTH  // 2
+                            cam_y = e.pos.y - SCREEN_HEIGHT // 2
+                            cam_x = max(0, min(cam_x, MAP_WIDTH  - SCREEN_WIDTH))
+                            cam_y = max(0, min(cam_y, MAP_HEIGHT - SCREEN_HEIGHT))
                     else:
                         drag_start = event.pos
                         drag_rect  = None
@@ -483,7 +544,7 @@ def main():
             cam_x += CAMERA_SPEED * dt
         if keys[pygame.K_w] or (my < CAMERA_EDGE_MARGIN):
             cam_y -= CAMERA_SPEED * dt
-        if keys[pygame.K_DOWN] or (my > SCREEN_HEIGHT - CAMERA_EDGE_MARGIN - 80):
+        if keys[pygame.K_DOWN] or (my > SCREEN_HEIGHT - CAMERA_EDGE_MARGIN):
             cam_y += CAMERA_SPEED * dt
         if keys[pygame.K_LEFT]:
             cam_x -= CAMERA_SPEED * dt
@@ -604,6 +665,13 @@ def main():
         mm_y = 10
         mm_surf = pygame.Surface((minimap.mm_w, minimap.mm_h), pygame.SRCALPHA)
         minimap.draw(mm_surf, world, sonar_hits)
+        # Viewport indicator — white rectangle showing the visible area
+        vx = cam_x / MAP_WIDTH  * minimap.mm_w
+        vy = cam_y / MAP_HEIGHT * minimap.mm_h
+        vw = SCREEN_WIDTH  / MAP_WIDTH  * minimap.mm_w
+        vh = SCREEN_HEIGHT / MAP_HEIGHT * minimap.mm_h
+        pygame.draw.rect(mm_surf, (255, 255, 255),
+                         (int(vx), int(vy), int(vw), int(vh)), 1)
         screen.blit(mm_surf, (mm_x, mm_y))
 
         if drag_rect and drag_rect.width > 2 and drag_rect.height > 2:
