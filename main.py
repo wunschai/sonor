@@ -286,22 +286,116 @@ def _draw_hud(surface, world, font):
     surface.blit(txt, (10, 10))
 
 
-def _draw_win_screen(surface, result, font_big):
+# ── Menu / overlay helpers ────────────────────────────────────────
+
+_BTN_W, _BTN_H = 280, 52
+_COL_BTN_IDLE  = (25, 40, 65)
+_COL_BTN_HOV   = (45, 80, 130)
+_COL_BTN_BDR   = (80, 130, 200)
+_COL_TITLE     = (120, 200, 255)
+
+
+def _menu_btn_rect(cx: int, cy: int) -> pygame.Rect:
+    return pygame.Rect(cx - _BTN_W // 2, cy - _BTN_H // 2, _BTN_W, _BTN_H)
+
+
+def _draw_btn(surface, font, rect: pygame.Rect, label: str, hovered: bool) -> None:
+    bg = _COL_BTN_HOV if hovered else _COL_BTN_IDLE
+    pygame.draw.rect(surface, bg, rect, border_radius=6)
+    pygame.draw.rect(surface, _COL_BTN_BDR, rect, 1, border_radius=6)
+    txt = font.render(label, True, (220, 225, 235))
+    surface.blit(txt, (rect.centerx - txt.get_width() // 2,
+                       rect.centery - txt.get_height() // 2))
+
+
+def _draw_main_menu(surface, font, font_big, mx: int, my: int) -> dict:
+    """Draw main menu; return dict of named button rects."""
+    surface.fill((8, 10, 18))
+    # starfield suggestion — simple dots
+    rng = random.Random(7)
+    for _ in range(120):
+        sx = rng.randint(0, SCREEN_WIDTH - 1)
+        sy = rng.randint(0, SCREEN_HEIGHT - 1)
+        pygame.draw.circle(surface, (rng.randint(80, 200),) * 3, (sx, sy), 1)
+
+    cx = SCREEN_WIDTH // 2
+    # Title
+    title = font_big.render("S O N O R", True, _COL_TITLE)
+    surface.blit(title, (cx - title.get_width() // 2, SCREEN_HEIGHT // 4 - 20))
+    sub = font.render("a space sonar RTS", True, (80, 110, 150))
+    surface.blit(sub, (cx - sub.get_width() // 2, SCREEN_HEIGHT // 4 + 34))
+
+    btns = {
+        "start": _menu_btn_rect(cx, SCREEN_HEIGHT // 2 - 10),
+        "rules": _menu_btn_rect(cx, SCREEN_HEIGHT // 2 + 70),
+        "quit":  _menu_btn_rect(cx, SCREEN_HEIGHT // 2 + 150),
+    }
+    labels = {"start": "Start Game", "rules": "Game Rules", "quit": "Quit"}
+    for key, rect in btns.items():
+        _draw_btn(surface, font, rect, labels[key], rect.collidepoint(mx, my))
+    return btns
+
+
+def _draw_rules_screen(surface, font, font_big, mx: int, my: int) -> dict:
+    """Draw game rules; return dict of named button rects."""
+    surface.fill((8, 10, 18))
+    cx = SCREEN_WIDTH // 2
+
+    title = font_big.render("Game Rules", True, _COL_TITLE)
+    surface.blit(title, (cx - title.get_width() // 2, 40))
+
+    rules = [
+        "Destroy the enemy Mothership to win.",
+        "Your Mothership is destroyed → defeat.",
+        "",
+        "Left-click  — select units / drag to box-select",
+        "Right-click — move selected ships",
+        "  Builder near asteroid → builds Mining Station",
+        "  Builder elsewhere    → builds Turret",
+        "Double-click roster   — jump camera to unit",
+        "",
+        "Sonar: passive sonar detects moving enemies.",
+        "Active pulse (S key) reveals all in range.",
+        "Boost (B key) increases ship speed.",
+        "",
+        "Minerals fund all production.",
+        "Mine asteroids with Mining Ships.",
+        "Produce units from your Mothership panel.",
+    ]
+    y = 110
+    for line in rules:
+        col = (160, 190, 220) if line else (0, 0, 0)
+        txt = font.render(line, True, col)
+        surface.blit(txt, (cx - txt.get_width() // 2, y))
+        y += 22
+
+    btns = {"back": _menu_btn_rect(cx, SCREEN_HEIGHT - 60)}
+    _draw_btn(surface, font, btns["back"], "← Back", btns["back"].collidepoint(mx, my))
+    return btns
+
+
+def _draw_result_overlay(surface, result, font, font_big, mx: int, my: int) -> dict:
+    """Draw win/lose overlay with menu/quit buttons; return button rects."""
     overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-    overlay.fill((0, 0, 0, 160))
+    overlay.fill((0, 0, 0, 170))
     surface.blit(overlay, (0, 0))
+
+    cx = SCREEN_WIDTH // 2
     if result == "player_win":
-        msg = "VICTORY!"
-        col = (80, 255, 100)
+        msg, col = "VICTORY!", (80, 255, 120)
     else:
-        msg = "DEFEAT..."
-        col = (255, 80, 80)
+        msg, col = "DEFEAT...", (255, 80, 80)
+
     txt = font_big.render(msg, True, col)
-    surface.blit(txt, (SCREEN_WIDTH // 2 - txt.get_width() // 2,
-                       SCREEN_HEIGHT // 2 - txt.get_height() // 2 - 20))
-    sub = font_big.render("Press R to restart  |  ESC to quit", True, (200, 200, 200))
-    surface.blit(sub, (SCREEN_WIDTH // 2 - sub.get_width() // 2,
-                       SCREEN_HEIGHT // 2 + 30))
+    surface.blit(txt, (cx - txt.get_width() // 2, SCREEN_HEIGHT // 2 - 70))
+
+    btns = {
+        "menu": _menu_btn_rect(cx - 150, SCREEN_HEIGHT // 2 + 10),
+        "quit": _menu_btn_rect(cx + 150, SCREEN_HEIGHT // 2 + 10),
+    }
+    _draw_btn(surface, font, btns["menu"], "Main Menu", btns["menu"].collidepoint(mx, my))
+    _draw_btn(surface, font, btns["quit"], "Quit",      btns["quit"].collidepoint(mx, my))
+    return btns
 
 
 # ── Input helpers ─────────────────────────────────────────────────
@@ -401,7 +495,10 @@ def main():
         w = build_test_world()
         return w, FogMap(MAP_WIDTH, MAP_HEIGHT), SonarFX(), EnemyAI()
 
-    world, fog, sonar_fx, enemy_ai = _new_game()
+    world = fog = sonar_fx = enemy_ai = None
+
+    # ── Scene state ───────────────────────────────────────────────
+    scene = "menu"   # "menu" | "rules" | "game"
 
     # Sonar subsystems
     minimap   = Minimap(map_w=MAP_WIDTH, map_h=MAP_HEIGHT, mm_w=200, mm_h=150)
@@ -436,6 +533,17 @@ def main():
 
     game_result = None   # "player_win" | "player_lose" | None
 
+    def _start_game():
+        nonlocal world, fog, sonar_fx, enemy_ai, game_result, scene
+        nonlocal selection, drag_start, drag_rect
+        world, fog, sonar_fx, enemy_ai = _new_game()
+        game_result = None
+        selection   = []
+        drag_start  = None
+        drag_rect   = None
+        control_panel.set_selection([], world=world)
+        scene = "game"
+
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
@@ -446,14 +554,48 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
+            # ── Menu scene ────────────────────────────────────────
+            elif scene == "menu":
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    btns = _draw_main_menu(screen, font, font_big, mx, my)
+                    if btns["start"].collidepoint(event.pos):
+                        _start_game()
+                    elif btns["rules"].collidepoint(event.pos):
+                        scene = "rules"
+                    elif btns["quit"].collidepoint(event.pos):
+                        running = False
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    running = False
+
+            # ── Rules scene ───────────────────────────────────────
+            elif scene == "rules":
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    btns = _draw_rules_screen(screen, font, font_big, mx, my)
+                    if btns["back"].collidepoint(event.pos):
+                        scene = "menu"
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    scene = "menu"
+
+            # ── Game scene ────────────────────────────────────────
+            elif scene == "game":
+                # Result overlay buttons
+                if game_result is not None:
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        btns = _draw_result_overlay(screen, game_result, font, font_big, mx, my)
+                        if btns["menu"].collidepoint(event.pos):
+                            scene = "menu"
+                        elif btns["quit"].collidepoint(event.pos):
+                            running = False
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                        scene = "menu"
+                    continue   # skip rest of game event handling while result shown
+
+            if scene != "game":
+                continue   # non-game scenes skip remaining handlers
+
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    running = False
-                if event.key == pygame.K_r and game_result is not None:
-                    # Restart
-                    world, fog, sonar_fx, enemy_ai = _new_game()
-                    selection = []; game_result = None
-                    control_panel.set_selection([], world=world)
+                    scene = "menu"
                 # Sonar toggle for selection
                 if event.key == pygame.K_s:
                     for e in selection:
@@ -585,6 +727,10 @@ def main():
                                             abs(ex - drag_start[0]),
                                             abs(ey - drag_start[1]))
 
+        # ── Game update (only when in game scene) ────────────────
+        if scene != "game":
+            continue
+
         # ── Camera movement ───────────────────────────────────────
         keys = pygame.key.get_pressed()
         if keys[pygame.K_a] or (mx < CAMERA_EDGE_MARGIN):
@@ -695,53 +841,60 @@ def main():
                 e._hit_flash = max(0.0, e._hit_flash - dt)
 
         # ── Draw ──────────────────────────────────────────────────
-        screen.fill((5, 5, 15))
+        if scene == "menu":
+            _draw_main_menu(screen, font, font_big, mx, my)
 
-        # Map border
-        border = pygame.Rect(-cam_x, -cam_y, MAP_WIDTH, MAP_HEIGHT)
-        pygame.draw.rect(screen, (30, 30, 50), border, 2)
+        elif scene == "rules":
+            _draw_rules_screen(screen, font, font_big, mx, my)
 
-        _draw_entities(screen, world, fog, cam_x, cam_y, selection, font)
+        else:  # "game"
+            screen.fill((5, 5, 15))
 
-        # Fog overlay (covers unknown areas)
-        fog.draw(screen, (cam_x, cam_y))
+            # Map border
+            border = pygame.Rect(-cam_x, -cam_y, MAP_WIDTH, MAP_HEIGHT)
+            pygame.draw.rect(screen, (30, 30, 50), border, 2)
 
-        # Sonar FX overlay (above fog so hits are visible through darkness)
-        sonar_fx.draw(screen, (cam_x, cam_y))
+            _draw_entities(screen, world, fog, cam_x, cam_y, selection, font)
 
-        # Minimap (top-right corner, avoids control panel overlap)
-        mm_x = SCREEN_WIDTH - minimap.mm_w - 10
-        mm_y = 10
-        mm_surf = pygame.Surface((minimap.mm_w, minimap.mm_h), pygame.SRCALPHA)
-        minimap.draw(mm_surf, world, sonar_hits)
-        # Viewport indicator — white rectangle showing the visible area
-        vx = cam_x / MAP_WIDTH  * minimap.mm_w
-        vy = cam_y / MAP_HEIGHT * minimap.mm_h
-        vw = SCREEN_WIDTH  / MAP_WIDTH  * minimap.mm_w
-        vh = SCREEN_HEIGHT / MAP_HEIGHT * minimap.mm_h
-        pygame.draw.rect(mm_surf, (255, 255, 255),
-                         (int(vx), int(vy), int(vw), int(vh)), 1)
-        screen.blit(mm_surf, (mm_x, mm_y))
+            # Fog overlay (covers unknown areas)
+            fog.draw(screen, (cam_x, cam_y))
 
-        if drag_rect and drag_rect.width > 2 and drag_rect.height > 2:
-            s = pygame.Surface((drag_rect.width, drag_rect.height), pygame.SRCALPHA)
-            s.fill((100, 200, 255, 40))
-            screen.blit(s, drag_rect.topleft)
-            pygame.draw.rect(screen, (100, 200, 255), drag_rect, 1)
+            # Sonar FX overlay (above fog so hits are visible through darkness)
+            sonar_fx.draw(screen, (cam_x, cam_y))
 
-        _draw_hud(screen, world, font)
+            # Minimap (top-right corner, avoids control panel overlap)
+            mm_x = SCREEN_WIDTH - minimap.mm_w - 10
+            mm_y = 10
+            mm_surf = pygame.Surface((minimap.mm_w, minimap.mm_h), pygame.SRCALPHA)
+            minimap.draw(mm_surf, world, sonar_hits)
+            # Viewport indicator — white rectangle showing the visible area
+            vx = cam_x / MAP_WIDTH  * minimap.mm_w
+            vy = cam_y / MAP_HEIGHT * minimap.mm_h
+            vw = SCREEN_WIDTH  / MAP_WIDTH  * minimap.mm_w
+            vh = SCREEN_HEIGHT / MAP_HEIGHT * minimap.mm_h
+            pygame.draw.rect(mm_surf, (255, 255, 255),
+                             (int(vx), int(vy), int(vw), int(vh)), 1)
+            screen.blit(mm_surf, (mm_x, mm_y))
 
-        # Unit roster (left side panel)
-        roster.draw(screen, world, selection)
+            if drag_rect and drag_rect.width > 2 and drag_rect.height > 2:
+                s = pygame.Surface((drag_rect.width, drag_rect.height), pygame.SRCALPHA)
+                s.fill((100, 200, 255, 40))
+                screen.blit(s, drag_rect.topleft)
+                pygame.draw.rect(screen, (100, 200, 255), drag_rect, 1)
 
-        # Control panel (bottom strip)
-        panel_surf.fill((0, 0, 0, 0))
-        control_panel.draw(panel_surf)
-        screen.blit(panel_surf, (0, SCREEN_HEIGHT - _PANEL_H))
+            _draw_hud(screen, world, font)
 
-        # Win/lose overlay
-        if game_result is not None:
-            _draw_win_screen(screen, game_result, font_big)
+            # Unit roster (left side panel)
+            roster.draw(screen, world, selection)
+
+            # Control panel (bottom strip)
+            panel_surf.fill((0, 0, 0, 0))
+            control_panel.draw(panel_surf)
+            screen.blit(panel_surf, (0, SCREEN_HEIGHT - _PANEL_H))
+
+            # Win/lose overlay with Main Menu / Quit buttons
+            if game_result is not None:
+                _draw_result_overlay(screen, game_result, font, font_big, mx, my)
 
         pygame.display.flip()
 
