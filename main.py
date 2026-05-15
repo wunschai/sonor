@@ -336,7 +336,7 @@ def _draw_main_menu(surface, font, font_big, mx: int, my: int) -> dict:
     return btns
 
 
-def _draw_rules_screen(surface, font, font_big, mx: int, my: int) -> dict:
+def _draw_rules_screen(surface, font, font_med, font_big, mx: int, my: int) -> dict:
     """Draw game rules; return dict of named button rects."""
     surface.fill((8, 10, 18))
     cx = SCREEN_WIDTH // 2
@@ -365,9 +365,9 @@ def _draw_rules_screen(surface, font, font_big, mx: int, my: int) -> dict:
     y = 110
     for line in rules:
         col = (160, 190, 220) if line else (0, 0, 0)
-        txt = font.render(line, True, col)
+        txt = font_med.render(line, True, col)
         surface.blit(txt, (cx - txt.get_width() // 2, y))
-        y += 22
+        y += 30
 
     btns = {"back": _menu_btn_rect(cx, SCREEN_HEIGHT - 60)}
     _draw_btn(surface, font, btns["back"], "← Back", btns["back"].collidepoint(mx, my))
@@ -489,6 +489,7 @@ def main():
     pygame.display.set_caption("Sonor")
     clock = pygame.time.Clock()
     font      = pygame.font.SysFont("monospace", 14)
+    font_med  = pygame.font.SysFont("monospace", 18)
     font_big  = pygame.font.SysFont("monospace", 36)
 
     def _new_game():
@@ -570,7 +571,7 @@ def main():
             # ── Rules scene ───────────────────────────────────────
             elif scene == "rules":
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    btns = _draw_rules_screen(screen, font, font_big, mx, my)
+                    btns = _draw_rules_screen(screen, font, font_med, font_big, mx, my)
                     if btns["back"].collidepoint(event.pos):
                         scene = "menu"
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -837,7 +838,7 @@ def main():
             _draw_main_menu(screen, font, font_big, mx, my)
 
         elif scene == "rules":
-            _draw_rules_screen(screen, font, font_big, mx, my)
+            _draw_rules_screen(screen, font, font_med, font_big, mx, my)
 
         else:  # "game"
             screen.fill((5, 5, 15))
