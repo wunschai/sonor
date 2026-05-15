@@ -728,117 +728,109 @@ def main():
                                             abs(ey - drag_start[1]))
 
         # ── Game update (only when in game scene) ────────────────
-        if scene != "game":
-            continue
+        if scene == "game":
+            # ── Camera movement ───────────────────────────────────
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_a] or (mx < CAMERA_EDGE_MARGIN):
+                cam_x -= CAMERA_SPEED * dt
+            if keys[pygame.K_d] or (mx > SCREEN_WIDTH - CAMERA_EDGE_MARGIN):
+                cam_x += CAMERA_SPEED * dt
+            if keys[pygame.K_w] or (my < CAMERA_EDGE_MARGIN):
+                cam_y -= CAMERA_SPEED * dt
+            if keys[pygame.K_DOWN] or (my > SCREEN_HEIGHT - CAMERA_EDGE_MARGIN):
+                cam_y += CAMERA_SPEED * dt
+            if keys[pygame.K_LEFT]:
+                cam_x -= CAMERA_SPEED * dt
+            if keys[pygame.K_RIGHT]:
+                cam_x += CAMERA_SPEED * dt
+            if keys[pygame.K_UP]:
+                cam_y -= CAMERA_SPEED * dt
 
-        # ── Camera movement ───────────────────────────────────────
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_a] or (mx < CAMERA_EDGE_MARGIN):
-            cam_x -= CAMERA_SPEED * dt
-        if keys[pygame.K_d] or (mx > SCREEN_WIDTH - CAMERA_EDGE_MARGIN):
-            cam_x += CAMERA_SPEED * dt
-        if keys[pygame.K_w] or (my < CAMERA_EDGE_MARGIN):
-            cam_y -= CAMERA_SPEED * dt
-        if keys[pygame.K_DOWN] or (my > SCREEN_HEIGHT - CAMERA_EDGE_MARGIN):
-            cam_y += CAMERA_SPEED * dt
-        if keys[pygame.K_LEFT]:
-            cam_x -= CAMERA_SPEED * dt
-        if keys[pygame.K_RIGHT]:
-            cam_x += CAMERA_SPEED * dt
-        if keys[pygame.K_UP]:
-            cam_y -= CAMERA_SPEED * dt
+            cam_x = max(0, min(cam_x, MAP_WIDTH  - SCREEN_WIDTH))
+            cam_y = max(0, min(cam_y, MAP_HEIGHT - SCREEN_HEIGHT))
 
-        cam_x = max(0, min(cam_x, MAP_WIDTH  - SCREEN_WIDTH))
-        cam_y = max(0, min(cam_y, MAP_HEIGHT - SCREEN_HEIGHT))
+            # ── Simple unit movement (CombatShip only) ────────────
+            for e in world.entities:
+                if isinstance(e, (MiningShip, BuilderShip)):
+                    continue   # handled by their respective systems
+                if hasattr(e, "_target_pos") and e._target_pos is not None:
+                    spd = e.speed_mode.effective_speed(e.speed) if hasattr(e, "speed_mode") else e.speed
+                    direction = e._target_pos - e.pos
+                    dist = direction.length()
+                    if dist < spd * dt:
+                        e.pos = pygame.Vector2(e._target_pos)
+                        e._target_pos = None
+                        if hasattr(e, "state"):
+                            e.state = "IDLE"
+                    else:
+                        e.pos += direction.normalize() * spd * dt
 
-        # ── Simple unit movement (CombatShip only) ───────────────
-        for e in world.entities:
-            if isinstance(e, (MiningShip, BuilderShip)):
-                continue   # handled by their respective systems
-            if hasattr(e, "_target_pos") and e._target_pos is not None:
-                spd = e.speed_mode.effective_speed(e.speed) if hasattr(e, "speed_mode") else e.speed
-                direction = e._target_pos - e.pos
-                dist = direction.length()
-                if dist < spd * dt:
-                    e.pos = pygame.Vector2(e._target_pos)
-                    e._target_pos = None
-                    if hasattr(e, "state"):
-                        e.state = "IDLE"
-                else:
-                    e.pos += direction.normalize() * spd * dt
+            # ── Game systems ──────────────────────────────────────
+            if game_result is None:
+                mining_sys.update(world, dt)
+                build_sys.update(world, dt)
+                combat_sys.update(world, dt)
+                enemy_ai.update(world, dt)
+                resolve_separation(world)
 
-        # ── Game systems ──────────────────────────────────────────
-        if game_result is None:
-            mining_sys.update(world, dt)
-            build_sys.update(world, dt)
-            combat_sys.update(world, dt)
-            enemy_ai.update(world, dt)
-            resolve_separation(world)
-
-            # ── Mothership build queues ───────────────────────────────
-            for e in list(world.entities):
-                if not isinstance(e, Mothership):
-                    continue
-                for q in e.build_queues:
-                    result = q.update(dt)
-                    if result is None:
+                # ── Mothership build queues ───────────────────────
+                for e in list(world.entities):
+                    if not isinstance(e, Mothership):
                         continue
-                    # Spawn the produced unit near the mothership
-                    spawn_pos = (e.pos.x + 40, e.pos.y + 40)
-                    if result == "CombatShip_S":
-                        world.add_entity(CombatShip(pos=spawn_pos, size="S", team=e.team))
-                    elif result == "CombatShip_M":
-                        world.add_entity(CombatShip(pos=spawn_pos, size="M", team=e.team))
-                    elif result == "CombatShip_L":
-                        world.add_entity(CombatShip(pos=spawn_pos, size="L", team=e.team))
-                    elif result == "MiningShip":
-                        world.add_entity(MiningShip(pos=spawn_pos, team=e.team))
-                    elif result == "BuilderShip":
-                        world.add_entity(BuilderShip(pos=spawn_pos, team=e.team))
+                    for q in e.build_queues:
+                        result = q.update(dt)
+                        if result is None:
+                            continue
+                        spawn_pos = (e.pos.x + 40, e.pos.y + 40)
+                        if result == "CombatShip_S":
+                            world.add_entity(CombatShip(pos=spawn_pos, size="S", team=e.team))
+                        elif result == "CombatShip_M":
+                            world.add_entity(CombatShip(pos=spawn_pos, size="M", team=e.team))
+                        elif result == "CombatShip_L":
+                            world.add_entity(CombatShip(pos=spawn_pos, size="L", team=e.team))
+                        elif result == "MiningShip":
+                            world.add_entity(MiningShip(pos=spawn_pos, team=e.team))
+                        elif result == "BuilderShip":
+                            world.add_entity(BuilderShip(pos=spawn_pos, team=e.team))
 
-            game_result = world.check_win_condition()
+                game_result = world.check_win_condition()
 
-        # ── Fog update ────────────────────────────────────────────
-        player_units = world.entities_for_team(0)
-        fog.update(player_units)
-        fog.reveal_asteroids(world.asteroids)
+            # ── Fog update ────────────────────────────────────────
+            player_units = world.entities_for_team(0)
+            fog.update(player_units)
+            fog.reveal_asteroids(world.asteroids)
 
-        # ── Sonar update ──────────────────────────────────────────
-        sonar_hits = []
+            # ── Sonar update ──────────────────────────────────────
+            sonar_hits = []
 
-        # Active sonar: tick SonarController, fire pulses
-        for e in world.entities:
-            if not hasattr(e, "sonar"):
-                continue
-            if e.sonar.update(dt):
-                strength = getattr(e, "sonar_strength", 1)
-                pulse = ActivePulse(origin=(e.pos.x, e.pos.y), strength=strength)
-                sonar_fx.add_pulse(pulse)
+            for e in world.entities:
+                if not hasattr(e, "sonar"):
+                    continue
+                if e.sonar.update(dt):
+                    strength = getattr(e, "sonar_strength", 1)
+                    pulse = ActivePulse(origin=(e.pos.x, e.pos.y), strength=strength)
+                    sonar_fx.add_pulse(pulse)
 
-        # Check hits against current pulses before advancing them
-        all_entities = list(world.entities)
-        for pulse in sonar_fx.pulses:
-            hits = pulse.check_hit(all_entities)
-            for h in hits:
+            all_entities = list(world.entities)
+            for pulse in sonar_fx.pulses:
+                hits = pulse.check_hit(all_entities)
+                for h in hits:
+                    sonar_fx.add_hit(h)
+                    sonar_hits.append(h)
+            sonar_fx.update(dt)
+
+            enemy_units = world.entities_for_team(1)
+            passive_hits = passive.detect(player_units, enemy_units, dt)
+            for h in passive_hits:
                 sonar_fx.add_hit(h)
                 sonar_hits.append(h)
-        # Advance pulses and expire dead ones
-        sonar_fx.update(dt)
 
-        # Passive sonar: detect moving enemies
-        enemy_units = world.entities_for_team(1)
-        passive_hits = passive.detect(player_units, enemy_units, dt)
-        for h in passive_hits:
-            sonar_fx.add_hit(h)
-            sonar_hits.append(h)
+            mining_sys.reveal_by_hits(world, sonar_hits)
 
-        # Reveal asteroids via sonar hits
-        mining_sys.reveal_by_hits(world, sonar_hits)
-
-        # ── Hit flash decay ───────────────────────────────────────
-        for e in world.entities:
-            if hasattr(e, "_hit_flash"):
-                e._hit_flash = max(0.0, e._hit_flash - dt)
+            # ── Hit flash decay ───────────────────────────────────
+            for e in world.entities:
+                if hasattr(e, "_hit_flash"):
+                    e._hit_flash = max(0.0, e._hit_flash - dt)
 
         # ── Draw ──────────────────────────────────────────────────
         if scene == "menu":
