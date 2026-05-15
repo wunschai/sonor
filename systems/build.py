@@ -6,7 +6,6 @@ from entities.ship import BuilderShip
 from entities.building import Mothership, MiningStation, Turret
 from entities.asteroid import Asteroid
 from constants import (
-    TEAM_PLAYER,
     STATION_BUILD_TIME, STATION_ATTACH_RADIUS,
     TURRET_BUILD_TIME,
 )
@@ -24,8 +23,7 @@ class BuildSystem:
     """Updates all BuilderShip state machines and completes construction."""
 
     def update(self, world, dt: float) -> None:
-        builders = [e for e in world.entities
-                    if isinstance(e, BuilderShip) and e.team == TEAM_PLAYER]
+        builders = [e for e in world.entities if isinstance(e, BuilderShip)]
 
         for b in builders:
             # Dead builder — reset progress, do nothing

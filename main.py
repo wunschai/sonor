@@ -492,7 +492,13 @@ def main():
                                 e.state = "IDLE"
                         elif isinstance(e, BuilderShip):
                             e.assigned_target = target_vec
-                            e.building_type = "MiningStation"
+                            # Auto-detect: near asteroid → Station, elsewhere → Turret
+                            from constants import STATION_ATTACH_RADIUS
+                            near_ast = any(
+                                ast.pos.distance_to(target_vec) <= STATION_ATTACH_RADIUS
+                                for ast in world.asteroids
+                            )
+                            e.building_type = "MiningStation" if near_ast else "Turret"
                             e.state = "MOVING_TO_SITE"
                         elif hasattr(e, "_target_pos"):
                             e._target_pos = target_vec + _offset_map.get(
